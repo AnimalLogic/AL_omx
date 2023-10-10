@@ -1,0 +1,3 @@
+#!/bin/bash
+
+rez-env Sphinx AL_documentation_utils AL_maya2 maya-2018 "$@"
