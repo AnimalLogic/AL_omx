@@ -1,11 +1,24 @@
-# Copyright (C) Animal Logic Pty Ltd. All rights reserved.
+# Copyright © 2023 Animal Logic. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import unittest
-from maya import cmds
-from maya.api import OpenMaya as om2
-from AL.maya2.omx.utils import _nodes
-from AL.maya2.omx.utils import _plugs
-from AL.maya2.omx.tests.utils import common
+
+from AL.omx.utils._stubs import cmds
+from AL.omx.utils._stubs import om2
+from AL.omx.utils import _nodes
+from AL.omx.utils import _plugs
+from AL.omx.tests.utils import common
 
 
 @_plugs._plugLockElision  # pylint: disable=protected-access
@@ -231,9 +244,18 @@ class PlugReadAndWriteOnNodeCase(unittest.TestCase):
         initValues = _plugs.valueFromPlug(plug)
         self.assertNotEqual(newValues, initValues)
         _plugs.setValueOnPlug(plug, newValues, modifier=modifier, doIt=True)
-        self.assertEqual(_plugs.valueFromPlug(plug), newValues)
+        actualValues = _plugs.valueFromPlug(plug)
+        self._assertNonNumericCompoundPlugValues(actualValues, newValues)
+
         modifier.undoIt()
         self.assertEqual(_plugs.valueFromPlug(plug), initValues)
+
+    def _assertNonNumericCompoundPlugValues(self, actualValue, expectedValues):
+        # in different maya version, the actual values might contains extra keys, so here
+        # we just assert all the expected keys and values are matched
+        for k, v in expectedValues.items():
+            self.assertTrue(k in actualValue)
+            self.assertEqual(v, actualValue[k])
 
     def test_getSimpleFloatArrayPlugValue(self):
         cube = cmds.polyCube()[0]

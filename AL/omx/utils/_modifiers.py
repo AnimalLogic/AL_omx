@@ -1,18 +1,27 @@
-# Copyright (C) Animal Logic Pty Ltd. All rights reserved.
+# Copyright © 2023 Animal Logic. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 import warnings
 
-from maya import cmds
-from maya.api import OpenMaya as om2
-from maya.api import OpenMayaAnim as om2anim
+from AL.omx.utils._stubs import om2
 
 logger = logging.getLogger(__name__)
 
 
 class MModifier(om2.MDagModifier):
-    """A `MDagModifier` that implements the ability to create a DG node.
-    
-    This way we don't need both an MDGModifier and a MDAGModifier which messes up the Undo/Redo.
+    """MModifier is a `om2.MDagModifier` that implements the ability to create both DG and DAG node.
     """
 
     def __init__(self):
@@ -48,7 +57,7 @@ class MModifier(om2.MDagModifier):
 
         Args:
             typeName (str): The Maya node type name.
-            parent (om2.MObject): The parent MObject. 
+            parent (om2.MObject, optional): The parent MObject. 
 
         Returns:
             om2.MObject: The DAG node created.
@@ -67,7 +76,7 @@ class MModifier(om2.MDagModifier):
         om2.MDagModifier.doIt(self)
 
     def createNode(self, *args, **kwargs):
-        """Create Dag or DG node based on the internal mode state.
+        """Create DAG or DG node based on the internal mode state.
 
         Returns:
             om2.MObject: The DAG/DG node created.
@@ -82,7 +91,7 @@ class MModifier(om2.MDagModifier):
 
 
 class ToDGModifier:
-    """A python context to use an MModifer in DGmode, which means MModifier.createNode() will create a DG node.
+    """A python context to use an :class:`MModifier` in DG mode, which means :func:`MModifier.createNode()` will create a DG node.
     """
 
     def __init__(self, mmodifer):
@@ -98,7 +107,7 @@ class ToDGModifier:
 
 
 class ToDagModifier:
-    """A python context to use an MModifer in DGmode, which means MModifier.createNode() will create a DAG node.
+    """A python context to use an :class:`MModifier` in DAG mode, which means :func:`MModifier.createNode()` will create a DAG node.
     """
 
     def __init__(self, mmodifer):

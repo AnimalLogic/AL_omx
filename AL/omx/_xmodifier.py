@@ -1,4 +1,16 @@
-# Copyright (C) Animal Logic Pty Ltd. All rights reserved.
+# Copyright © 2023 Animal Logic. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import inspect
 import contextlib
@@ -7,25 +19,93 @@ import sys
 import logging
 from functools import wraps
 
-from maya import cmds
-from maya.api import OpenMaya as om2
-from maya.api import OpenMayaAnim as om2anim
 
-from AL.maya2.omx import _xnode
-from AL.maya2.omx.utils import _nodes
-from AL.maya2.omx.utils import _modifiers
+from AL.omx.utils._stubs import cmds
+from AL.omx.utils._stubs import om2
+from AL.omx.utils._stubs import om2anim
+
+from AL.omx import _xnode
+from AL.omx.utils import _nodes
+from AL.omx.utils import _modifiers
 
 logger = logging.getLogger(__name__)
 
 
 _CURRENT_MODIFIER_LIST = []
+_JOURNAL_TOGGLE = None
+
+
+def setJournalToggle(state):
+    """By default we don't keep journal for all the creation or edit by omx. Use this function
+    to turn it on.
+
+    Notes:
+        Keep in mind this is a global state, turning on journal will slow down the overall 
+        performance!
+
+        Another way to toggle the journal on is to set it to None (default value) and set the 
+        logging level to ``logging.DEBUG`` for ``AL.omx._xmodifier``.
+
+        Also turning the journal on only makes omx start to record journal, the creation or 
+        edits that are already done still won't be in the journal.
+
+    Args:
+        state (bool | None): the state of toggle. 
+            True = force on, off = force off, None = depends on it is DEBUG logging level
+    """
+    global _JOURNAL_TOGGLE
+    _JOURNAL_TOGGLE = state
+    if state is None:
+        logger.info(
+            "The omx journal state now depends on logging level for AL.omx._xmodifier"
+        )
+    else:
+        logger.info("The omx journal state is turned %s", state)
+
+
+def isJournalOn():
+    """Query if we are actually recording journal for each creation or edit by omx.
+    """
+    if _JOURNAL_TOGGLE is None:
+        return logger.isEnabledFor(logging.DEBUG)
+
+    return _JOURNAL_TOGGLE
+
+
+class JournalContext:
+    """A python context where you set the journal state by force.
+    
+    Notes:
+        Turning on by calling :func:`setJournalToggle(True)` will slowdown omx performance
+        globally. This is the suggested way to have the journal temporarily set to on/off.
+    """
+
+    def __init__(self, state=True):
+        self._state = state
+        self._oldState = _JOURNAL_TOGGLE
+
+    def __enter__(self):
+        setJournalToggle(self._state)
+        return self
+
+    def __exit__(self, *_, **__):
+        setJournalToggle(self._oldState)
 
 
 class NodeCreationLog:
-    """Helper class to enable/disable and manage tracked nodes.
+    """Helper class to enable/disable and manage tracked nodes, you are suppose to only have
+    one instance of this class in memory, within this python module.
 
-    Log entries are done in a First In Last Out approach to allow for nested tracking
-    when a parent that wants to track nodes calls a child that also wants to track nodes.
+    Notes:
+        Log entries are done in a First In Last Out approach to allow for nested tracking
+        when a parent that wants to track nodes calls a child that also wants to track nodes.
+
+        The data is held in this form:
+        [
+            [:class:`om2.MObjectHandle`,...], 
+            [:class:`om2.MObjectHandle`,...], 
+            ...
+        ]
     """
 
     def __init__(self):
@@ -42,18 +122,20 @@ class NodeCreationLog:
         """Remove all or the last list of tracked nodes in the log.
 
         Args:
-            clearAll (bool): If true, remove the entire log.
+            clearAll (bool, optional): If true, remove the entire log.
         """
         if clearAll:
             self._log = []
-        self._log.pop()
+        else:
+            self._log.pop()
         self._isActive = len(self._log) >= 1
 
     def trackedNodes(self, queryAll=False):
         """The nodes that have been tracked in the creation log.
 
         Args:
-            queryAll (bool): If true, get the entire log, otherwise just the last key in the log.
+            queryAll (bool, optional): If true, get the entire log, otherwise retrieve the
+                last key in the log.
 
         Returns:
             list[:class:`om2.MObjectHandle`]: The list of created nodes.
@@ -70,7 +152,7 @@ class NodeCreationLog:
         """Add a node to the last active key in the tracking log.
 
         Args:
-            node (:class:`omx.XNode`): The node to track.
+            node (:class:`XNode`): The node to track.
         """
         if not self.isActive():
             return
@@ -99,7 +181,8 @@ def endTrackingNodes(endAll=False):
     """Stop and clear the last (or all) active log(s) of tracked nodes.
 
     Args:
-        endAll (bool): If true, ends all active tracking.
+        endAll (bool, optional): If true, ends all active tracking.
+
     Returns:
         list[:class:`om2.MObjectHandle`]: The list of created nodes that had been tracked.
     """
@@ -116,8 +199,8 @@ def queryTrackedNodes(queryAll=False):
     """The mobject handles to the nodes that have been created since tracking has been started.
 
     Args:
-        queryAll (bool): If true, return the entire list of handles, otherwise just the handles
-                         since startTrackingNodes has last been called.
+        queryAll (bool, optional): If true, return the entire list of handles, otherwise just the handles
+        since startTrackingNodes has last been called.
 
     Returns:
         list[:class:`om2.MObjectHandle`]: The list of created nodes.
@@ -130,22 +213,23 @@ def queryTrackedNodes(queryAll=False):
 
 
 class TrackCreatedNodes:
-    """
-    A Python Context Decorator to temporarily track nodes that have been created with omx
+    """A Python Context Decorator to temporarily track nodes that have been created with omx
 
-    Example usage:
+    Examples:
 
-    @TrackCreatedNodes()
-    def methodToCreateNodes():
-        # Create nodes
-        nodesCreated = omx.queryTrackedNodes()
+    .. code:: python
 
-    OR
+        # The class can be used as decorator, or python context:
 
-    def methodToCreateNodes():
-        with TrackCreatedNodes() as tracker:
+        @TrackCreatedNodes()
+        def methodToCreateNodes():
             # Create nodes
-            nodesCreated = tracker.trackedNodes()
+            nodesCreated = omx.queryTrackedNodes()
+        
+        def methodToCreateNodes():
+            with TrackCreatedNodes() as tracker:
+                # Create nodes
+                nodesCreated = tracker.trackedNodes()
     """
 
     def __call__(self, func):
@@ -167,11 +251,11 @@ class TrackCreatedNodes:
         """Get the om2.MObjectHandle(s) created that are tracked.
 
         Args:
-            queryAll (bool): Whether return all batches of om2.MObjectHandles or just the last
-                batch.
+            queryAll (bool, optional): Whether return all batches of om2.MObjectHandles or just the last
+            batch.
 
         Returns:
-            list[:class:`om2.MObjectHandle`]: Created nodes.
+            [:class:`om2.MObjectHandle`]: Created nodes.
         """
         return queryTrackedNodes(queryAll)
 
@@ -180,6 +264,12 @@ class XModifierLog:
     __slots__ = ["method", "values"]
 
     def __init__(self, method, values):
+        """Internal wrapper object to hold the method name and argument values.
+
+        Args:
+            method (str): the method name.
+            values (list): the list of arguments for method call, excluding self.
+        """
         self.method = method
         self.values = values
 
@@ -188,17 +278,35 @@ class XModifierLog:
 
 
 def _modifierMethod(method):
+    """A function decorator for :class:`XModifier` methods.
+    
+    Notes:
+        This decorator;
+        - Converts :class:`XNode` instances to om2.MObjects .
+        - Records a method call log in the journal.
+        - Calls the method.
+        - Calls doIt() to apply the potential edits in immediate mode.
+
+    Args:
+        method (callable): the callable method  object.
+
+    Returns:
+        callable: the wrapped method
+    """
+
     @wraps(method)
     def wrapper(*args, **kwargs):
         self = args[0]
 
-        # Add journal entry, convert all MObjects to MObjectHandles
-        values = inspect.getcallargs(method, *args, **kwargs)
-        del values["self"]
-        for k, v in values.items():
-            if isinstance(v, om2.MObject):
-                values[k] = om2.MObjectHandle(v)
-        self._journal.append(XModifierLog(method.__name__, values))  # NOQA
+        # Add journal entry if needed, convert all MObjects to MObjectHandles
+        if isJournalOn():
+            values = inspect.getcallargs(method, *args, **kwargs)
+            del values["self"]
+            for k, v in values.items():
+                if isinstance(v, om2.MObject):
+                    values[k] = om2.MObjectHandle(v)
+            self._journal.append(XModifierLog(method.__name__, values))  # NOQA
+
         self._clean = False  # NOQA
 
         # Process args to convert any XNode to MObject
@@ -207,6 +315,7 @@ def _modifierMethod(method):
             if isinstance(arg, _xnode.XNode):
                 arg = arg.object()
             newArgs.append(arg)
+
         for k, v in kwargs.items():
             if isinstance(v, _xnode.XNode):
                 kwargs[k] = v.object()
@@ -223,11 +332,12 @@ def _modifierMethod(method):
 
 
 class XModifier:
-    """ A wrapper around _modifiers.MModifier that supports :class:`_xnode.XNode` instances directly
+    """ A wrapper around :class:`MModifier` that supports :class:`XNode` instances directly
 
-    When created in immediate mode, every time any modifier method is run on this object the doIt method is also run from within a
-    dynamic AL_OMXCommand instance to allow undoing.
-    Immediate mode will always be much slower than non-immediate mode, and is only there to allow simple experimentation from the maya script editor.
+    Notes:
+        When created in immediate mode, every time any modifier method is run on this object the doIt method is also run from within a
+        dynamic :class:`AL_OMXCommand` instance to allow undoing. Immediate mode will always be much slower than non-immediate mode,
+        and is only there to allow simple experiments from the Maya script editor.
     """
 
     def __init__(self, immediate=False):
@@ -245,7 +355,7 @@ class XModifier:
         self._clean = True
 
     def journal(self):
-        """Returns the current list of operations to run
+        """Returns the current list of operations to run.
 
         Returns:
             list(str): A list of strings describing the operations to run.
@@ -282,28 +392,34 @@ class XModifier:
                 DoItModifierWrapper(self, self._modifier).doIt()
         finally:
             if logger.isEnabledFor(logging.DEBUG):
-                logger.debug("Just called doIt on:\n%s", "\n".join(self.journal()))
+                if isJournalOn():
+                    logger.debug("Just called doIt on:\n%s", "\n".join(self.journal()))
+                else:
+                    logger.debug("Just called doIt (No journal available)")
+
             if not keepJournal:
                 self._journal = []
 
     def isClean(self):
         """Returns True if the modifier has nothing to do.
 
-        isClean() will also return True if the modifier has already been used by a Command.
+        Notes:
+            It will also return True if the modifier has already been used by a Command.
 
         Returns:
-            bool: anything to do with this modifier?
+            bool: the clean state.
         """
         return self._clean
 
     def doIt(self, keepJournal=False):
-        """Executes the modifier in Maya. In immediate mode this will actually execute doIt from within a dynamic maya command to allow undo to function.
+        """Executes the operations held by this modifier in Maya. 
+        
+        Notes:
+            In immediate mode this will actually execute doIt from within a dynamic Maya command to allow undo to function.
 
-        Executes the modifier's operations. If doIt() is called multiple times
-        in a row, without any intervening calls to undoIt(), then only the
-        operations which were added since the previous doIt() call will be
-        executed. If undoIt() has been called then the next call to doIt() will
-        do all operations.
+            If doIt() is called multiple times in a row, without any intervening calls to undoIt(), then only the
+            operations which were added since the previous doIt() call will be executed. If undoIt() has been 
+            called then the next call to doIt() will do all operations.
 
         Args:
             keepJournal (bool, optional): Retains the journal for further inspection. Defaults to False.
@@ -318,10 +434,12 @@ class XModifier:
             self._reset()
 
     def undoIt(self, keepJournal=False):
-        """Undo the modifier operation in Maya. In immediate mode this function does nothing, as you should already be able to undo it in Maya.
+        """Undo the modifier operation in Maya. In immediate mode this function does nothing, as you should already 
+        be able to undo it in Maya.
 
         Notes:
             It is only used in the scenario that a user creates a modifier manually by calling omx.newModifier()
+
         Args:
             keepJournal (bool, optional): Retains the journal for further inspection. Defaults to False.
         """
@@ -337,7 +455,13 @@ class XModifier:
                 DoItModifierWrapper(self, self._modifier).undoIt()
         finally:
             if logger.isEnabledFor(logging.DEBUG):
-                logger.debug("Just called undoIt on:\n%s", "\n".join(self.journal()))
+                if isJournalOn():
+                    logger.debug(
+                        "Just called undoIt on:\n%s", "\n".join(self.journal())
+                    )
+                else:
+                    logger.debug("Just called undoIt (No journal available)")
+
             if not keepJournal:
                 self._journal = []
 
@@ -350,7 +474,8 @@ class XModifier:
         be added as well, so only the parent needs to be added using this method.
 
         Args:
-            node (:class:`_xnode.XNode` | :class:`om2.MObject`): the node to add an attribute to
+            node (:class:`XNode` | :class:`om2.MObject`): the node to add an attribute to
+            
             attribute (:class:`om2.MObject`): the attribute MObject
 
         Returns:
@@ -365,12 +490,14 @@ class XModifier:
     def addExtensionAttribute(self, nodeClass, attribute):
         """Adds an extension attribute to a node class
 
-        Adds an operation to the modifier to add a new extension attribute to
-        the given node class. If the attribute is a compound its children will be
-        added as well, so only the parent needs to be added using this method.
+        Notes:
+            Adds an operation to the modifier to add a new extension attribute to
+            the given node class. If the attribute is a compound its children will be
+            added as well, so only the parent needs to be added using this method.
 
         Args:
             nodeClass (:class:`om2.MNodeClass`): The node class
+            
             attribute (:class:`om2.MObject`): The attribute MObject to add
 
         Returns:
@@ -383,13 +510,14 @@ class XModifier:
     def commandToExecute(self, command):
         """Adds an operation to the modifier to execute a MEL command.
 
-        The command should be fully undoable otherwise unexpected results may occur. If
-        the command contains no undoable portions whatsoever, the call to
-        doIt() may fail, but only after executing the command. It is best to
-        use multiple commandToExecute() calls rather than batching multiple
-        commands into a single call to commandToExecute(). They will still be
-        undone together, as a single undo action by the user, but Maya will
-        better be able to recover if one of the commands fails.
+        Notes:
+            The command should be fully undoable otherwise unexpected results may occur. If
+            the command contains no undoable portions whatsoever, the call to
+            doIt() may fail, but only after executing the command. It is best to
+            use multiple commandToExecute() calls rather than batching multiple
+            commands into a single call to commandToExecute(). They will still be
+            undone together, as a single undo action by the user, but Maya will
+            better be able to recover if one of the commands fails.
 
         Args:
             command (str): The command string
@@ -434,14 +562,15 @@ class XModifier:
 
     @_modifierMethod
     def createDGNode(self, typeName, nodeName=""):
-        """Creates a DG node
+        """Creates a DG node.
 
         Args:
-            typeName (str): the type of the object to create, e.g. "transform"
+            typeName (str): the type of the object to create, e.g. "transform".
+
             nodeName (str, optional): the node name, if non empty will be used in a modifier.renameObject call. Defaults to "".
 
         Returns:
-            :class:`_xnode.XNode`: An _xnode.XNode instance around the created MObject.
+            :class:`XNode`: A XNode instance around the created MObject.
         """
         mob = self._modifier.createDGNode(typeName)
         if nodeName:
@@ -463,7 +592,7 @@ class XModifier:
         manageTransformIfNeeded=True,
         returnAllCreated=False,
     ):
-        """Creates a DAG node
+        """Creates a DAG node.
 
         Adds an operation to the modifier to create a DAG node of the specified type. If a parent DAG node is provided the new node will be parented under it.
         If no parent is provided and the new DAG node is a transform type then it will be parented under the world. In both of these cases the method returns
@@ -475,20 +604,29 @@ class XModifier:
         None of the newly created nodes will be added to the DAG until the modifier's doIt() method is called.
 
         Notes:
-            If you try to use createDagNode() to create an empty NURBSCurve or Mesh, calling bestFn() on the returned
-            `XNode` will give you MFnNurbsCurve or MFnMesh but these are invalid to work with. You will end up getting a 
-            misleading "Object does not exist." error as Maya doesn't like an empty NURBSCurve or Mesh.
+            If you try to use :func:`createDagNode()` to create an empty NurbsCurve or Mesh, calling bestFn() on the returned
+            :class:`XNode` will give you `MFnNurbsCurve` or `MFnMesh` but these are invalid to work with. You will end up getting a 
+            misleading "Object does not exist." error as Maya doesn't like an empty NurbsCurve or Mesh.
 
         Raises:
             :class:`TypeError` if the node type does not exist or if the parent is not a transform type.
 
         Args:
-            typeName (str): the type of the object to create, e.g. "transform"
-            parent (:class:`om2.MObject` | :class:`_xnode.XNode`, optional): An optional parent for the DAG node to create
+            typeName (str): the type of the object to create, e.g. "transform".
+
+            parent (:class:`om2.MObject` | :class:`XNode`, optional): An optional parent for the DAG node to create.
+            
             nodeName (str, optional): the node name, if non empty will be used in a modifier.renameObject call. Defaults to "".
-            returnAllCreated (bool, optional): If True, it will return all newly created nodes, potentially including any new parent transforms and the shape of the type.
+            
+            manageTransformIfNeeded (bool, optional): when you create a shape without a parent, Maya will create both transform and shape, and 
+            return parent om2.MObject instead. if manageTransformIfNeeded is True, than we will also rename the transform, 
+            and return shape MObject instead. Most of time we keep it default True value.
+            
+            returnAllCreated (bool, optional): If True, it will return all newly created nodes, potentially including any new parent 
+            transforms and the shape of the type.
+        
         Returns:
-            :class:`_xnode.XNode` | list: An _xnode.XNode instance around the created MObject, or the list of all created nodes, if returnAllCreated is True.
+            :class:`XNode` | list: An _xnode.XNode instance around the created MObject, or the list of all created nodes, if returnAllCreated is True.
         """
         if parent is None:
             parent = om2.MObject.kNullObj
@@ -499,6 +637,7 @@ class XModifier:
                 xparent = parent
             else:
                 xparent = _xnode.XNode(parent)
+
             if not xparent.object().hasFn(om2.MFn.kTransform):
                 parent = xparent.bestFn().parent(0)
 
@@ -540,7 +679,7 @@ class XModifier:
             typeName (str): the type of the object to create, e.g. "transform"
 
         Returns:
-            :py:class:`om2.MObject`: The created MObject
+            :class:`om2.MObject`: The created MObject
         """
         # if any parent keyword is specified, we want to create a dag node for sure. Otherwise, we check the node type.
         if kwargs.get("parent") or "dagNode" in cmds.nodeType(
@@ -613,7 +752,7 @@ class XModifier:
 
         Args:
             plugin (:class:`om2.MObject`): The plugin
-            attribute (:class:`om2.MObject`): The attribute
+            attribute (:class:`om2.MObject`): The attribute MObject
 
         Returns:
             :class:`XModifier`: A reference to self
@@ -795,7 +934,7 @@ class XModifier:
         recover if one of the commands fails.
 
         Args:
-            callable_ (callable | str): The command to execute
+            callable (callable | str): The command to execute
 
         Returns:
             :class:`XModifier`: A reference to self
@@ -815,7 +954,8 @@ class XModifier:
         call as their behaviour may become unpredictable.
 
         Args:
-            node (:class:`_xnode.XNode` | :class:`om2.MObject`): the node to remove the attribute from
+            node (:class:`XNode` | :class:`om2.MObject`): the node to remove the attribute from
+            
             attribute (:class:`om2.MObject`): the attribute MObject
 
         Returns:
@@ -837,6 +977,7 @@ class XModifier:
 
         Args:
             nodeClass (:class:`om2.MNodeClass`): The node class
+            
             attribute (:class:`om2.MObject`): The attribute MObject to add
 
         Returns:
@@ -859,6 +1000,7 @@ class XModifier:
 
         Args:
             nodeClass (:class:`om2.MNodeClass`): The node class
+            
             attribute (:class:`om2.MObject`): The attribute MObject to add
 
         Returns:
@@ -873,6 +1015,7 @@ class XModifier:
 
         Args:
             plug (:class:`XPlug` | :class:`om2.MPlug`): The plug
+            
             breakConnections (bool): breaks the connections
 
         Returns:
@@ -886,9 +1029,12 @@ class XModifier:
         """Adds an operation to the modifer that renames a dynamic attribute on the given dependency node.
 
         Args:
-            node (:class:`_xnode.XNode` | :class:`om2.MObject`): the node to rename the attribute on
+            node (:class:`XNode` | :class:`om2.MObject`): the node to rename the attribute on
+            
             attribute (:class:`om2.MObject`): the attribute MObject
+            
             newShortName (str): The new short name
+            
             newLongName (str): The new long name
 
         Returns:
@@ -902,7 +1048,8 @@ class XModifier:
         """Adds an operation to the modifer to rename a node.
 
         Args:
-            node (:class:`_xnode.XNode` | :class:`om2.MObject`): the node to rename
+            node (:class:`XNode` | :class:`om2.MObject`): the node to rename
+            
             newName (str): the new name
 
         Returns:
@@ -916,7 +1063,8 @@ class XModifier:
         """Adds an operation to the modifier to set the lockState of a node.
 
         Args:
-            node (:class:`_xnode.XNode` | :class:`om2.MObject`): the node to lock
+            node (:class:`XNode` | :class:`om2.MObject`): the node to lock
+            
             newState (bool): the lock state
 
         Returns:
@@ -941,6 +1089,7 @@ class XModifier:
 
         Args:
             plugin (:class:`om2.MObject`): The plugin
+            
             attribute (:class:`om2.MObject`): The attribute MObject to add
 
         Returns:
@@ -959,18 +1108,20 @@ class XModifier:
         If it is not a transform type then the doIt() will raise a RuntimeError.
 
         Args:
-            node (:class:`om2.MObject` | :class:`_xnode.XNode`): The Dag node to reparent
-            newParent (:class:`om2.MObject` | :class:`_xnode.XNode`, optional): The new parent. Defaults to None.
-            absolute (bool): Whether or not we try to maintain the world transform of the node.
-                If the node has some transform channels locked, it will try to fill the unlocked channels with debug
-                message.
+            node (:class:`om2.MObject` | :class:`XNode`): The DAG node to reparent
+
+            newParent (:class:`om2.MObject` | :class:`XNode`, optional): The new parent. Defaults to None.
+
+            absolute (bool, optional): Whether or not we try to maintain the world transform of the node.
+            If the node has some transform channels locked, it will try to fill the unlocked channels with debug
+            message.
 
         Returns:
             :class:`XModifier`: A reference to self
         """
         if not node.hasFn(om2.MFn.kDagNode):
             raise TypeError(
-                "The XModifier.reparentNode() received non-Dag node to reparent."
+                "The XModifier.reparentNode() received non-DAG node to reparent."
             )
 
         nodeX = _xnode.XNode(node)
@@ -992,7 +1143,7 @@ class XModifier:
 
             if not parentNodeX.hasFn(om2.MFn.kDagNode):
                 raise TypeError(
-                    "The XModifier.reparentNode() received non-Dag node to reparent to."
+                    "The XModifier.reparentNode() received non-DAG node to reparent to."
                 )
 
             # Avoid reparenting if it is already under the parent:
@@ -1037,36 +1188,49 @@ class DoItModifierWrapper:
             self._mmod.doIt()
         except Exception as e:
             _, exc_value, _ = sys.exc_info()
-            j = self._xmod.journal()
-            if not j:
-                logger.error("Failed to call doIt: %s", exc_value)
-            if len(j) == 1:
-                logger.error("Failed to call doIt on %s: %s", j[0], exc_value)
-            else:
-                logger.error(
-                    "Failed to run doIt on operations: %s\n%s", exc_value, "\n".join(j)
-                )
-            journal = ", ".join(j)
-            raise Exception(f"{exc_value} when calling {journal}") from e
+            if isJournalOn():
+                j = self._xmod.journal()
+                if not j:
+                    logger.error("Failed to call doIt: %s", exc_value)
+                if len(j) == 1:
+                    logger.error("Failed to call doIt on %s: %s", j[0], exc_value)
+                else:
+                    logger.error(
+                        "Failed to run doIt on operations: %s\n%s",
+                        exc_value,
+                        "\n".join(j),
+                    )
+
+                journal = ", ".join(j)
+                raise Exception(f"{exc_value} when calling {journal}") from e
+
+            raise Exception(
+                f"{exc_value} when calling doIt (journal unavailable)"
+            ) from e
 
     def undoIt(self):
         try:
             self._mmod.undoIt()
         except Exception as e:
             _, exc_value, _ = sys.exc_info()
-            j = self._xmod.journal()
-            if not j:
-                logger.error("Failed to call undoIt: %s", exc_value)
-            elif len(j) == 1:
-                logger.error("Failed to call undoIt on %s: %s", j[0], exc_value)
-            else:
-                logger.error(
-                    "Failed to run undoIt on operations: %s\n%s",
-                    exc_value,
-                    "\n".join(j),
-                )
-            journal = ", ".join(j)
-            raise Exception(f"{exc_value} when calling {journal}") from e
+            if isJournalOn():
+                j = self._xmod.journal()
+                if not j:
+                    logger.error("Failed to call undoIt: %s", exc_value)
+                elif len(j) == 1:
+                    logger.error("Failed to call undoIt on %s: %s", j[0], exc_value)
+                else:
+                    logger.error(
+                        "Failed to run undoIt on operations: %s\n%s",
+                        exc_value,
+                        "\n".join(j),
+                    )
+                journal = ", ".join(j)
+                raise Exception(f"{exc_value} when calling {journal}") from e
+
+            raise Exception(
+                f"{exc_value} when calling undoIt (journal unavailable)"
+            ) from e
 
     def redoIt(self):
         self.doIt()
@@ -1092,7 +1256,7 @@ def currentModifier():
     """Returns the last XModifier from the current modifier list. If the current list is empty it creates and returns a new immediate XModifier.
 
     Returns:
-        :class:`XModifier`: A XModifier instance ready to use.
+        :class:`XModifier`: A :class:`XModifier` instance ready to use.
     """
     if not _CURRENT_MODIFIER_LIST:
         mod = XModifier(immediate=True)
@@ -1116,7 +1280,7 @@ def newModifier():
 
 
 def newAnimCurveModifier():
-    """Creates a new MAnimCurveChange object, adds it to the current list of modifiers and returns it.
+    """Creates a new `om2anim.MAnimCurveChange` object, adds it to the current list of modifiers and returns it.
 
     Returns:
         :class:`om2anim.MAnimCurveChange`: The newly created MAnimCurveChange
@@ -1140,7 +1304,7 @@ def executeModifiersWithUndo():
     """Execute modifier actions with undo support.
 
     Notes:
-        This will push a AL_OMXCommand mpx undoable command in the Maya undo queue.
+        This will push a ``AL_OMXCommand`` mpx undoable command in the Maya undo queue.
     """
     if _CURRENT_MODIFIER_LIST:
         cmds.AL_OMXCommand()
@@ -1148,10 +1312,10 @@ def executeModifiersWithUndo():
 
 @contextlib.contextmanager
 def newModifierContext():
-    """Create a new xModifier for the context, and call xModifier.doIt() on context exit.
+    """Create a new :class:`XModifier` for the context, and call :func:`XModifier.doIt()` on context exit.
 
     Notes:
-        Any edits done within the python context, they are using the new xModifier.
+        Any edits done within the python context, they are using the new :class:`XModifier`.
     """
     if _CURRENT_MODIFIER_LIST:
         # execute any previous doIt upon entering new context
@@ -1174,7 +1338,7 @@ def commandModifierContext(command):
         This is a util only for AL internal use.
 
     Args:
-        command (:py:class:`AL.libs.command.command.Command`): The command instance
+        command (:class:`Command`): The command instance
     """
     command._managedByXModifer = True  # NOQA
 
@@ -1213,22 +1377,23 @@ def commandModifierContext(command):
 def createDagNode(
     typeName, parent=om2.MObject.kNullObj, nodeName="", returnAllCreated=False
 ):
-    """Creates a DAG Node within the current active XModifier
+    """Creates a DAG Node within the current active :class:`XModifier`
 
     Note: 
-        We automatically work around a limitation of the Maya MDagModifier here, where Maya would return the shape's parent 
-        transform MObject. Instead we return an `XNode` for the newly created Shape node if the type is of Shape.
+        We automatically work around a limitation of the om2.MDagModifier here, where Maya would return the shape's parent 
+        transform MObject. Instead we return an :class:`XNode` for the newly created Shape node if the type is of Shape.
 
     Args:
-        typeName (str): The type of the DAG node to create
-        parent (:class:`XNode` | :class:`om2.MObject` | :class:`om2.MFnDagNode` | str, optional): The parent of the DAG node to create.
-            Defaults to om2.MObject.kNullObj.
+        typeName (str): The type of the DAG node to create.
+        
+        parent (:class:`XNode` | :class:`om2.MObject` | :class:`om2.MFnDagNode` | str, optional): The parent of the DAG node to create. Defaults to `om2.MObject.kNullObj`.
+        
         nodeName (str, optional): The name of the node to create (used to call mod.renameNode after creation). Defaults to "".
-        returnAllCreated (bool, optional): If True, it will return any newly created nodes, including potential new parent transform 
-            and the shape of the type.
+        
+        returnAllCreated (bool, optional): If True, it will return any newly created nodes, including potential new parent transform and the shape of the type.
 
     Returns:
-        :class:`XNode`: The created XNode
+        :class:`XNode` | [:class:`XNode`]: The created XNode or a list of XNodes, based on returnAllCreated argument.
     """
     return currentModifier().createDagNode(
         typeName, parent=parent, nodeName=nodeName, returnAllCreated=returnAllCreated
@@ -1236,20 +1401,21 @@ def createDagNode(
 
 
 def createDGNode(typeName, nodeName=""):
-    """Creates a DG Node within the current active XModifier
+    """Creates a DG Node within the current active :class:`XModifier`
 
     Args:
-        typeName (str): The node type name
+        typeName (str): The node type name.
+        
         nodeName (str, optional): The node name (to be used in mod.renameNode after creation). Defaults to "".
 
     Returns:
-        :class:`XNode`: The created XNode
+        :class:`XNode` | [:class:`XNode`]: The created XNode.
     """
     return currentModifier().createDGNode(typeName, nodeName=nodeName)
 
 
 def doIt():
-    """Runs doIt on all current modifiers
+    """Runs doIt on all current modifiers, similar to om2.MDGModifier.doIt().
     """
     for mod in _CURRENT_MODIFIER_LIST[:]:
         mod.doIt()

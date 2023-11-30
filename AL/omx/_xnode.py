@@ -1,59 +1,61 @@
-# Copyright (C) Animal Logic Pty Ltd. All rights reserved.
+# Copyright © 2023 Animal Logic. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import logging
-from maya.api import OpenMaya as om2
 
-from AL.maya2.omx import _xplug
-from AL.maya2.omx.utils import _nodes
-from AL.maya2.omx.utils import _plugs
+from AL.omx.utils._stubs import om2
+
+from AL.omx import _xplug
+from AL.omx.utils import _nodes
+from AL.omx.utils import _plugs
 
 logger = logging.getLogger(__name__)
 
 
 class XNode:
-    """ Easy wrapper around om2 objects mainly to access plugs"
-
-    Example:
-        This shows how to use omx to connect 2 nodes::
-
-            from AL.maya2 import omx
-
-            trn = omx.createDagNode("transform", nodeName="myTrn")
-            mtx = trn.worldMatrix[0].value()
-
-            reparent = omx.createDGNode("AL_rig_reparentSingle")
-            reparent.worldMatrix.connect(trn.worldMatrix[0])
+    """Easy wrapper around om2 objects mainly to access plugs. 
     """
 
     _NODE_CLASS_CACHE = {}
     _ATTRIBUTE_CACHE = {}
 
-    def __init__(self, thingToEasify):
+    def __init__(self, obj):
         """ Creates a new XNode
 
         Args:
-            thingToEasify (:py:class:`om2.MObject` | :py:class:`XNode` | :py:class:`om2.MFnBase` | string): A maya object to wrap
+            obj (:class:`om2.MObject` | :class:`XNode` | :class:`om2.MFnBase` | string): A object to wrap
 
         Returns:
-            :py:class:`omx.XNode`: An instance of a XNode object
+            :class:`XNode`: An instance of a XNode object
         """
-        if isinstance(thingToEasify, om2.MObject):
-            mob = thingToEasify
-        elif isinstance(thingToEasify, om2.MObjectHandle):
-            mob = thingToEasify.object()
-        elif isinstance(thingToEasify, XNode):
-            mob = thingToEasify.object()
-        elif isinstance(thingToEasify, om2.MFnBase):
-            mob = thingToEasify.object()
-        elif isinstance(thingToEasify, om2.MDagPath):
-            mob = thingToEasify.node()
-        elif isinstance(thingToEasify, str):
-            mob = _nodes.findNode(thingToEasify)
+        if isinstance(obj, om2.MObject):
+            mob = obj
+        elif isinstance(obj, om2.MObjectHandle):
+            mob = obj.object()
+        elif isinstance(obj, XNode):
+            mob = obj.object()
+        elif isinstance(obj, om2.MFnBase):
+            mob = obj.object()
+        elif isinstance(obj, om2.MDagPath):
+            mob = obj.node()
+        elif isinstance(obj, str):
+            mob = _nodes.findNode(obj)
             if mob is None:
-                raise RuntimeError(f"Object {thingToEasify} is not valid!")
+                raise RuntimeError(f"Object {obj} is not valid!")
 
         else:
-            raise RuntimeError(f"Cannot use {thingToEasify} with XNode!")
+            raise RuntimeError(f"Cannot use {obj} with XNode!")
 
         if mob != om2.MObject.kNullObj and not mob.hasFn(om2.MFn.kDependencyNode):
             raise RuntimeError(
@@ -61,9 +63,9 @@ class XNode:
             )
 
         self._mobHandle = om2.MObjectHandle(mob)
-        depNode = om2.MFnDependencyNode(mob)
-        self._lastKnownName = depNode.absoluteName()
-        self._mayaType = mayaType = depNode.typeName
+        nodeFn = om2.MFnDependencyNode(mob)
+        self._lastKnownName = nodeFn.absoluteName()
+        self._mayaType = mayaType = nodeFn.typeName
         nodeCls = XNode._NODE_CLASS_CACHE.get(mayaType, None)
         if nodeCls is None:
             nodeCls = om2.MNodeClass(mayaType)
@@ -89,6 +91,7 @@ class XNode:
         nodeClass = XNode._NODE_CLASS_CACHE[mayaType]
         attrs = XNode._ATTRIBUTE_CACHE[mayaType]
         attr = attrs.get(name, None)
+        # if it is a dynamic attribute:
         if attr is None:
             if not nodeClass.hasAttribute(name):
                 plug = _plugs.findPlug(name, mob)
@@ -104,14 +107,16 @@ class XNode:
     def object(self):
         """Returns the associated MObject
 
+        Raises:
+            RuntimeError: When the MObject is invalid.
+
         Returns:
-            :py:class:`om2.MObject`: the associated MObject
+            :class:`om2.MObject`: the associated MObject
         """
         mobHandle = object.__getattribute__(self, "_mobHandle")
-        if not mobHandle.isAlive():
-            lastName = object.__getattribute__(self, "_lastKnownName")
-            raise RuntimeError(f"XNode({lastName}) is not alive!")
 
+        # no need to test isAlive() as being valid is guaranteed to be alive.
+        # and usually we only care if it is valid.
         if not mobHandle.isValid():
             lastName = object.__getattribute__(self, "_lastKnownName")
             raise RuntimeError(f"XNode({lastName}) is not valid!")
@@ -181,10 +186,11 @@ class XNode:
 
         Args:
             typeName (string): the type of the object to create, e.g. "transform"
+            
             nodeName (str, optional): the node name, if non empty will be used in a modifier.renameObject call. Defaults to "".
 
         Returns:
-            :class:`xnode.XNode`: An xnode.XNode instance around the created MObject.
+            :class:`XNode`: An XNode instance around the created MObject.
         """
         mob = self.object()
         if not mob.hasFn(om2.MFn.kDagNode):
@@ -192,7 +198,7 @@ class XNode:
                 f"Cannot create a DAG node {nodeName}[{typeName}] under this non-DAG node {self}"
             )
 
-        from AL.maya2.omx import _xmodifier
+        from AL.omx import _xmodifier
 
         return _xmodifier.createDagNode(typeName, parent=mob, nodeName=nodeName)
 
@@ -217,7 +223,7 @@ class XNode:
         """Returns the basic MFnDAGNode or MFnDependencyNode for the associated MObject
 
         Notes:
-            Usually you would use xnode.bestFn() to get the most useful function set. But for an empty NURBS curve
+            Usually you would use xnode.bestFn() to get the most useful function set. But for an empty nurbsCurve
             or an empty mesh node, only xnode.basicFn() will work as expected.
 
         Returns:
@@ -230,6 +236,15 @@ class XNode:
         return om2.MFnDependencyNode(mob)
 
     def __str__(self):
+        """Returns an easy-readable str representation of this XNode. 
+
+        Construct a minimum unique path to support duplicate MObjects in scene. 
+        For invalid MObject we return the last known name with a suffix (dead) 
+        or (invalid) respectively.
+
+        Returns:
+            str: the string representation.
+        """
         mobHandle = object.__getattribute__(self, "_mobHandle")
         if not mobHandle.isAlive():
             lastName = object.__getattribute__(self, "_lastKnownName")
@@ -249,6 +264,11 @@ class XNode:
         return "None"
 
     def __repr__(self):
+        """Get the more unambiguous str representation. This is mainly for debugging purposes.
+
+        Returns:
+            str
+        """
         return f'XNode("{self}")'
 
     def __eq__(self, other):
@@ -263,6 +283,8 @@ class XNode:
         return False
 
     def __ne__(self, other):
+        """Add support for XNode comparison.
+        """
         if isinstance(other, XNode):
             return self.object().__ne__(other.object())
 
@@ -272,4 +294,6 @@ class XNode:
         return True
 
     def __hash__(self):
+        """Add support for using XNode for containers that require uniqueness, e.g. dict key.
+        """
         return object.__getattribute__(self, "_mobHandle").hashCode()

@@ -1,16 +1,30 @@
-# Copyright (C) Animal Logic Pty Ltd. All rights reserved.
+# Copyright © 2023 Animal Logic. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 
-from maya import cmds
-from maya.api import OpenMaya as om2
-from AL.maya2.omx.utils import _plugs
-from AL.maya2.omx.utils import _exceptions
+
+from AL.omx.utils._stubs import cmds
+from AL.omx.utils._stubs import om2
+from AL.omx.utils import _plugs
+from AL.omx.utils import _exceptions
 
 logger = logging.getLogger(__name__)
 
 
 def _currentModifier():
-    from AL.maya2.omx import _xmodifier
+    from AL.omx import _xmodifier
 
     return _xmodifier.currentModifier()
 
@@ -21,16 +35,24 @@ class XPlug(om2.MPlug):
     You can use omx.XPlug over an om2.MPlug to take advantage of the extra convenience features.
 
     Examples:
-        xplug.get()                 --> Get you the value of the plug
-        xplug.set(value)            --> Set the value of the plug
-        xplug[0]                    --> The element xplug by the logicial index 0 if xplug is an array plug.
-        xplug['childAttr']          --> The child xplug named 'childAttr' if xplug is a compound plug.
-        xplug.xnode()               --> Get you the parent xnode.
 
-        Invalid Examples:
-            xplug['childAttr.attr1']    !!! This won't work, use xplug['childAttr']['attr1'] instead.
-            xplug['childAttr[0]']       !!! This won't work, use xplug['childAttr'][0] instead.
+    .. code:: python
+
+        xplug = xnode.attr
+        xplug.get()                 # Get you the value of the plug
+        xplug.set(value)            # Set the value of the plug
+        xplug[0]                    # The element xplug by the logicial index 0 if xplug is an array plug.
+        xplug['childAttr']          # The child xplug named 'childAttr' if xplug is a compound plug.
+        xplug.xnode()               # Get you the parent xnode.
+
+    Invalid Examples:
+
+    .. code:: python
+
+        xplug['childAttr.attr1']    # This won't work, use xplug['childAttr']['attr1'] instead.
+        xplug['childAttr[0]']       # This won't work, use xplug['childAttr'][0] instead.
         ...
+
     """
 
     def __init__(self, *args, **kwargs):
@@ -40,8 +62,7 @@ class XPlug(om2.MPlug):
         """Get the value of the plug.
         
         Args:
-            asDegrees (bool): For an angle unit attribute we return the value in degrees
-                or in radians.
+            asDegrees (bool, optional): For an angle unit attribute we return the value in degrees or in radians.
         """
         return _plugs.valueFromPlug(self, flattenComplexData=False, asDegrees=asDegrees)
 
@@ -50,13 +71,18 @@ class XPlug(om2.MPlug):
 
         Notes:
             For enum attribute, you can set value by both short int or a valid enum name string.
-            To retrieve the valid enum names, use XPlug.enumNames()
+            To retrieve the valid enum names, use :func:`XPlug.enumNames()`
+
+            This method does many checks to make sure it works for different types of attributes.
+            If you know the type of attribute, the preference would be to use the set*() methods 
+            instead, they are more lightweight and have better performance.
 
         Args:
             value (any): The plug value to set.
-            asDegrees (bool): When it is an angle unit attribute, if this is True than we take the 
-                value as degrees, otherwise as radians.This flag has no effect
-                when it is not an angle unit attribute.
+
+            asDegrees (bool, optional): When it is an angle unit attribute, if this is True than 
+            we take the value as degrees, otherwise as radians.This flag has no effect when it is 
+            not an angle unit attribute.
 
         Returns:
             The previous value if it is simple plug and the set was successful. None or empty list
@@ -65,6 +91,102 @@ class XPlug(om2.MPlug):
         return _plugs.setValueOnPlug(
             self, value, modifier=_currentModifier(), doIt=False, asDegrees=asDegrees
         )
+
+    def setBool(self, value):
+        """Adds an operation to the modifier to set a value onto a bool plug.
+
+        Args:
+            value (bool): the value.
+        """
+        _currentModifier().newPlugValueBool(self, value)
+
+    def setChar(self, value):
+        """Adds an operation to the modifier to set a value onto a char (single
+        byte signed integer) plug.
+
+        Args:
+            value (int): the value.
+        """
+        _currentModifier().newPlugValueChar(self, value)
+
+    def setDouble(self, value):
+        """Adds an operation to the modifier to set a value onto a double-precision
+        float plug.
+
+        Args:
+            value (float): the value.
+        """
+        _currentModifier().newPlugValueDouble(self, value)
+
+    def setFloat(self, value):
+        """Adds an operation to the modifier to set a value onto a single-precision
+        float plug.
+
+        Args:
+            value (float): the value.
+        """
+        _currentModifier().newPlugValueFloat(self, value)
+
+    def setInt(self, value):
+        """Adds an operation to the modifier to set a value onto an int plug.
+
+        Args:
+            value (int): the value.
+        """
+        _currentModifier().newPlugValueInt(self, value)
+
+    def setAngle(self, value):
+        """Adds an operation to the modifier to set a value onto an angle plug.
+
+        Args:
+            value (``om2.MAngle``): the value.
+        """
+        _currentModifier().newPlugValueMAngle(self, value)
+
+    def setDistance(self, value):
+        """Adds an operation to the modifier to set a value onto a distance plug.
+
+        Args:
+            value (``om2.MDistance``): the value.
+        """
+        _currentModifier().newPlugValueMDistance(self, value)
+
+    def setTime(self, value):
+        """Adds an operation to the modifier to set a value onto a time plug.
+
+        Args:
+            value (``om2.MTime``): the value.
+        """
+        _currentModifier().newPlugValueMTime(self, value)
+
+    def setShort(self, value):
+        """Adds an operation to the modifier to set a value onto a short
+        integer plug.
+
+        Args:
+            value (int): the value.
+        """
+        _currentModifier().newPlugValueShort(self, value)
+
+    def setString(self, value):
+        """Adds an operation to the modifier to set a value onto a string plug.
+
+        Args:
+            value (str): the value.
+        """
+        _currentModifier().newPlugValueString(self, value)
+
+    def setCompoundDouble(self, value):
+        """Adds an operation to the modifier to compound attribute's double 
+        plugs children.
+
+        Args:
+            value ([double]): the list of double value whose amount should be 
+                no larger to the amount of children.
+        """
+        for i, v in enumerate(value):
+            child = self.child(i)
+            _currentModifier().newPlugValueDouble(child, v)
 
     def enumNames(self):
         """Get the enum name tuple if it is an enum attribute, otherwise None.
@@ -78,30 +200,31 @@ class XPlug(om2.MPlug):
         """ Disconnect this plug from a source plug, if it's connected
         """
         if self.isDestination:
-            self._modifyInUnlocked(_currentModifier().disconnect, self.source(), self)
+            with self.UnlockedModification(self):
+                _currentModifier().disconnect(self.source(), self)
 
     def connectTo(self, destination, force=False):
         """ Connect this plug to a destination plug
 
         Args:
             destination (:class:`om2.MPlug` | :class:`XPlug`): destination plug
-            force (bool): override existing connection
+
+            force (bool, optional): override existing connection
         """
-        if destination.isDestination:
+        destXPlug = XPlug(destination)
+        if destXPlug.isDestination:
             if not force:
                 logger.warning(
                     "%s connected to %s, use force=True to override this connection",
-                    destination,
-                    destination.source(),
+                    destXPlug,
+                    destXPlug.source(),
                 )
                 return
 
-            XPlug(destination).disconnectFromSource()
+            destXPlug.disconnectFromSource()
 
-        connector = _currentModifier().connect
-        XPlug(destination)._modifyInUnlocked(
-            connector, self, destination
-        )  # pylint: disable=protected-access
+        with self.UnlockedModification(destXPlug):
+            _currentModifier().connect(self, destXPlug)
 
     def connectFrom(self, source, force=False):
         """ Connect this plug to a source plug
@@ -110,7 +233,8 @@ class XPlug(om2.MPlug):
 
         Args:
             source (:class:`om2.MPlug` | :class:`XPlug`): source plug
-            force (bool): override existing connection
+            
+            force (bool, optional): override existing connection
         """
         if self.isDestination:
             if not force:
@@ -121,7 +245,9 @@ class XPlug(om2.MPlug):
                 )
                 return
             self.disconnectFromSource()
-        self._modifyInUnlocked(_currentModifier().connect, source, self)
+
+        with self.UnlockedModification(self):
+            _currentModifier().connect(source, self)
 
     def setLocked(self, locked):
         """Set the plug's lock state.
@@ -174,7 +300,7 @@ class XPlug(om2.MPlug):
         Returns:
             omx.XNode
         """
-        from AL.maya2.omx import _xnode
+        from AL.omx import _xnode
 
         return _xnode.XNode(om2.MPlug.node(self))
 
@@ -204,13 +330,21 @@ class XPlug(om2.MPlug):
         logger.debug(cmd)
         _currentModifier().commandToExecute(cmd)
 
-    def _modifyInUnlocked(self, action, *args, **kwargs):
-        locked = self.isLocked
-        if locked:
-            self.setLocked(False)
-        action(*args, **kwargs)
-        if locked:
-            self.setLocked(True)
+    class UnlockedModification:
+        def __init__(self, xplug):
+            self._xplug = xplug
+
+        def __enter__(self):
+            self._oldLocked = self._xplug.isLocked
+            if self._oldLocked:
+                # here we cannot use `plug.isLocked = False` because when doIt()
+                # is called, it is already reverted to locked.
+                self._xplug.setLocked(False)
+            return self
+
+        def __exit__(self, *_, **__):
+            if self._oldLocked:
+                self._xplug.setLocked(True)
 
     @staticmethod
     def _iterPossibleNamesOfPlug(plug):
@@ -241,10 +375,10 @@ class XPlug(om2.MPlug):
 
     def __iter__(self):
         """Adds support for the `for p in xPlug` syntax so you can iter through an
-            array's elements, or a compound's children, as XPlugs.
+        array's elements, or a compound's children, as XPlugs.
 
         Yields:
-            omx.XPlug
+            :class:`XPlug`
         """
         if self.isArray:
             for logicalIndex in self.getExistingArrayAttributeIndices():
@@ -254,11 +388,14 @@ class XPlug(om2.MPlug):
                 yield XPlug(self.child(i))
 
     def __getitem__(self, key):
-        """Adds support for the `xplug[key]` syntax where you can get one of an
-            array's elements, or a compound's child, as XPlug.
+        """Adds support for the `xplug[key]` syntax where you can get one of an array's elements, 
+        or a compound's child, as XPlug.
+
+        Args:
+            key (int | str): The array element plug logical index or the child plug name.
 
         Returns:
-            omx.XPlug
+            :class:`XPlug`
         
         Raises:
             AttributeError if compound plug doesn't have the child with name, TypeError
@@ -289,8 +426,12 @@ class XPlug(om2.MPlug):
         raise TypeError(f"The valid types for XPlug['{key}'] are: int | string.")
 
     def __contains__(self, key):
-        """Add support for the `key in xPlug` syntax. Checks if the index is an existing index 
-        of an array, or the str name is a valid child of a compound.
+        """Add support for the `key in xPlug` syntax. 
+        
+        Checks if the index is an existing index of an array, or the str name is a valid child of a compound.
+
+        Args:
+            key (int | str): The array element plug logical index or the child plug name.
 
         Notes:
             We can extend to accept om2.MPlug or omx.XPlug as the input to check, but here we just 

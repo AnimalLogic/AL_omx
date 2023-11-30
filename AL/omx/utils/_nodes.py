@@ -1,8 +1,21 @@
-# Copyright (C) Animal Logic Pty Ltd. All rights reserved.
+# Copyright © 2023 Animal Logic. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import logging
-from maya import cmds
-from maya.api import OpenMaya as om2
+
+from AL.omx.utils._stubs import cmds
+from AL.omx.utils._stubs import om2
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +63,7 @@ def closestAvailableNodeName(nodeName, _maximumAttempts=10000):
 
     Args:
         nodeName (str): the input name.
-        _maximumAttempts (int): The maximum attempts before get a node name that does not exists.
+        _maximumAttempts (int, optional): The maximum attempts before get a node name that does not exists.
         
     Returns:
         str | None: Return the closest name that is available if nodeName is a valid Maya
@@ -97,7 +110,7 @@ def findNode(nodeName):
         nodeName (str): full or short name of the node
 
     Returns:
-        (MObject) if found (None) otherwise
+        om2.MObject if found or None otherwise
     """
     # to avoid expensive check for existence, wrap with try except...
     # A cmds.objExists() test will return True for duplicate-named nodes, but it will

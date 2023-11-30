@@ -1,7 +1,22 @@
-# Copyright (C) Animal Logic Pty Ltd. All rights reserved.
+# Copyright © 2023 Animal Logic. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 
 class NullXPlugError(RuntimeError):
+    """Used when an unexpected null XPlug is encountered.
+    """
+
     pass
 
 
@@ -19,11 +34,14 @@ class PlugArrayOutOfBounds(Exception):
 
 
 class PlugMayaInvalidException(Exception):
-    """This is very specific.
-    Sometimes Maya generates plugs in an invalid state that are perfectly legal, but won't 
-    behave as expected. These plugs can hard crash Maya when manipulated or queried.
-    The most common example are arrays of compounds without any elements.
-    This is to be used for those cases, and for those cases only.
+    """This is very specific Exception for invalid maya plug.
+
+    Notes:
+        Sometimes Maya generates plugs in an invalid state that are perfectly legal, but won't 
+        behave as expected. These plugs can hard crash Maya when manipulated or queried.
+        The most common example are arrays of compounds without any elements.
+
+        This is to be used for those cases, and for those cases only.
     """
 
     __DEFAULT_MESSAGE = (
@@ -37,14 +55,14 @@ class PlugMayaInvalidException(Exception):
             plug (om2.MPlug): The plug to raise exception for.
             message (str, optional): The message override, a default message will be used if not provided.
         """
-        self.plugname = None
+        self.plugName = None
         localMessage = message or self.__DEFAULT_MESSAGE
         try:
-            self.plugname = plug.name()
+            self.plugName = plug.name()
         except Exception:  # yeah, it's an except all, but we don't want errorception here.
-            self.plugname = self.__PLUGNOTFOUND_MESSAGE
+            self.plugName = self.__PLUGNOTFOUND_MESSAGE
 
-        self.message = f"error on plug: {self.plugname} - {localMessage}"
+        self.message = f"Error on plug: {self.plugName} - {localMessage}"
         super().__init__(self.message)
 
 
@@ -63,14 +81,14 @@ class PlugUnhandledTypeException(Exception):
             subTypeID (int): The numeric type, `om2.MFnNumericData.k*`.
             message (str, optional): The message override, a default message will be used if not provided.
         """
-        self.plugname = None
+        self.plugName = None
         localMessage = message or self.__DEFAULT_MESSAGE
         try:
-            self.plugname = plug.name()
+            self.plugName = plug.name()
         except Exception:
-            self.plugname = self.__PLUGNOTFOUND_MESSAGE
+            self.plugName = self.__PLUGNOTFOUND_MESSAGE
 
-        self.message = f"error on plug: {self.plugname} of type and subtype: {typeID},{subTypeID} - {localMessage}"
+        self.message = f"Error on plug: {self.plugName} of type and subtype: {typeID},{subTypeID} - {localMessage}"
         super().__init__(self.message)
 
 
@@ -85,11 +103,32 @@ class PlugAttributePredicateError(Exception):
         Args:
             plug (om2.MPlug): The plug to raise exception for.
         """
-        self.plugname = None
+        self.plugName = None
         try:
-            self.plugname = plug.name()
+            self.plugName = plug.name()
         except Exception:
-            self.plugname = self.__PLUGNOTFOUND_MESSAGE
+            self.plugName = self.__PLUGNOTFOUND_MESSAGE
 
-        self.message = f"error on plug: {self.plugname} attribute functors failed"
+        self.message = f"Error on plug: {self.plugName} attribute functors failed"
+        super().__init__(self.message)
+
+
+class PlugLockedForEditError(Exception):
+    """An exception raised when calling predicate function results in an error.
+    """
+
+    __PLUGNOTFOUND_MESSAGE = "[INVALID PLUG]."
+
+    def __init__(self, plug):
+        """
+        Args:
+            plug (om2.MPlug): The plug to raise exception for.
+        """
+        self.plugName = None
+        try:
+            self.plugName = plug.name()
+        except Exception:
+            self.plugName = self.__PLUGNOTFOUND_MESSAGE
+
+        self.message = f"The plug: {self.plugName} is locked from edit."
         super().__init__(self.message)

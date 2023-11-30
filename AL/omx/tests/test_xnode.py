@@ -1,10 +1,24 @@
-# Copyright (C) Animal Logic Pty Ltd. All rights reserved.
+# Copyright © 2023 Animal Logic. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import unittest
 import logging
-from maya import cmds
-from maya.api import OpenMaya as om2
-from AL.maya2 import omx
+
+from AL.omx.utils._stubs import cmds
+from AL.omx.utils._stubs import om2
+from AL import omx
+from AL.omx import _xmodifier
 
 logger = logging.getLogger(__name__)
 
@@ -115,37 +129,63 @@ class XNodeCase(unittest.TestCase):
 
     def testCustomNode(self):
         transform = omx.createDagNode("transform", nodeName="myTransform")
-        rep = omx.createDGNode("AL_rig_reparentSingle", "myReparent")
-        transform.translate.connectFrom(rep.translate)
+        mtx = omx.createDGNode("decomposeMatrix", "myMtx")
+        transform.translate.connectFrom(mtx.outputTranslate)
 
         self.assertEqual(
             cmds.listConnections("myTransform.translate", plugs=True),
-            ["myReparent.translate"],
+            ["myMtx.outputTranslate"],
         )
 
     def testPlugMethods(self):
         transform = omx.createDagNode("transform", nodeName="myTransform")
-        rep = omx.createDGNode("AL_rig_reparentSingle", "myReparent")
-        transform.translate.connectFrom(rep.translate)
+        upstream = omx.createDGNode("decomposeMatrix", "upstreamDG")
+        transform.translate.connectFrom(upstream.outputTranslate)
 
-        self.assertIsInstance(rep.outSRT.child(0), omx.XPlug)
+        self.assertIsInstance(upstream.outputTranslate.child(0), omx.XPlug)
         self.assertIsInstance(transform.translate.source(), omx.XPlug)
-        self.assertIsInstance(rep.translate.destinations()[0], omx.XPlug)
+        self.assertIsInstance(upstream.outputTranslate.destinations()[0], omx.XPlug)
+
+    def _checkJournal(self, modifier, expectedJournal):
+        transform = omx.createDagNode("transform", nodeName="myTransform")
+        upstream = omx.createDGNode("decomposeMatrix", "upstreamMtx")
+        transform.translate.connectFrom(upstream.outputTranslate)
+        modifier.doIt(keepJournal=True)
+        self.assertEqual(modifier.journal(), expectedJournal)
 
     def testMofifierJournal(self):
+        fullJournal = [
+            "mod.createDagNode({'manageTransformIfNeeded': 'True', 'nodeName': 'myTransform', 'parent': None, 'returnAllCreated': 'False', 'typeName': 'transform'})",
+            "mod.createDGNode({'nodeName': 'upstreamMtx', 'typeName': 'decomposeMatrix'})",
+            "mod.connect({'args': '(XPlug(\"upstreamMtx.outputTranslate\"), XPlug(\"myTransform.translate\"))', 'kwargs': '{}'})",
+        ]
+        # check when journal is forced on:
         with omx.newModifierContext() as mod:
-            transform = omx.createDagNode("transform", nodeName="myTransform")
-            rep = omx.createDGNode("AL_rig_reparentSingle", "myReparent")
-            transform.translate.connectFrom(rep.translate)
-            mod.doIt(keepJournal=True)
-            self.assertEqual(
-                mod.journal(),
-                [
-                    "mod.createDagNode({'manageTransformIfNeeded': 'True', 'nodeName': 'myTransform', 'parent': None, 'returnAllCreated': 'False', 'typeName': 'transform'})",
-                    "mod.createDGNode({'nodeName': 'myReparent', 'typeName': 'AL_rig_reparentSingle'})",
-                    "mod.connect({'args': '(XPlug(\"myReparent.translate\"), XPlug(\"myTransform.translate\"))', 'kwargs': '{}'})",
-                ],
-            )
+            with omx.JournalContext():
+                self.assertTrue(omx.isJournalOn())
+                self._checkJournal(mod, fullJournal)
+
+        # check when journal is forced off:
+        with omx.newModifierContext() as mod:
+            with omx.JournalContext():
+                self.assertTrue(omx.isJournalOn())
+                with omx.JournalContext(state=False):
+                    self.assertFalse(omx.isJournalOn())
+                    self._checkJournal(mod, [])
+
+        # check when journal is decided by logging level:
+        oldLevel = _xmodifier.logger.level
+        cmds.file(new=True, f=True)  # create new file so node name don't change.
+        for level in (logging.DEBUG, logging.INFO):
+            _xmodifier.logger.setLevel(level)
+            isInDebug = _xmodifier.logger.isEnabledFor(logging.DEBUG)
+            expectedJournal = fullJournal if isInDebug else []
+            with omx.newModifierContext() as mod:
+                with omx.JournalContext(state=None):
+                    self.assertEqual(omx.isJournalOn(), isInDebug)
+                    self._checkJournal(mod, expectedJournal)
+
+        _xmodifier.logger.setLevel(oldLevel)
 
     def testDynamicAttrs(self):
         transform1 = omx.createDagNode("transform", nodeName="myTransform1")
@@ -205,22 +245,22 @@ class XNodeCase(unittest.TestCase):
         )
         child1 = omx.createDagNode("transform", nodeName="child", parent=transform1)
         child2 = omx.createDagNode("transform", nodeName="child", parent=transform2)
-        rep = omx.createDGNode("AL_rig_reparentSingle", "myReparent")
+        timeNode = omx.createDGNode("time", "myDG")
 
         self.assertEqual(str(transform1), "myTransform1")
         self.assertEqual(repr(transform1), 'XNode("myTransform1")')
         self.assertEqual(str(child1), "myTransform1|child")
         self.assertEqual(str(child2), "myTransform2|child")
-        self.assertEqual(repr(rep), 'XNode("myReparent")')
-        self.assertEqual(str(rep.translate), "myReparent.translate")
-        self.assertEqual(repr(rep.translate), 'XPlug("myReparent.translate")')
+        self.assertEqual(repr(timeNode), 'XNode("myDG")')
+        self.assertEqual(str(timeNode.outTime), "myDG.outTime")
+        self.assertEqual(repr(timeNode.frozen), 'XPlug("myDG.frozen")')
 
     def testBestFn(self):
         transform = omx.createDagNode("transform", nodeName="myTransform1")
         fn = transform.bestFn()
         self.assertIsInstance(fn, om2.MFnTransform)
-        rep = omx.createDGNode("AL_rig_reparentSingle", "myReparent")
-        fn = rep.bestFn()
+        timeNode = omx.createDGNode("time", "myDG")
+        fn = timeNode.bestFn()
         self.assertIsInstance(fn, om2.MFnDependencyNode)
 
     def testUndoContext(self):
@@ -354,13 +394,13 @@ class XNodeCase(unittest.TestCase):
             mod.createNode("locator", nodeName="loc1Shape", parent=loc1)
             mod.createNode("transform", parent=loc1)
             mod.createNode("transform", parent=loc1)
-            mod.createNode("AL_rig_reparentSingle", nodeName="rep1")
+            mod.createNode("time", nodeName="myTime")
 
         self.assertTrue(cmds.objExists("loc1"))
         self.assertTrue(cmds.objExists("loc1|loc1Shape"))
         self.assertTrue(cmds.objExists("loc1|transform1"))
         self.assertTrue(cmds.objExists("loc1|transform2"))
-        self.assertTrue(cmds.objExists("rep1"))
+        self.assertTrue(cmds.objExists("myTime"))
 
     def testCoumpoundPlug(self):
         cond = omx.createDGNode("condition", nodeName="cond")

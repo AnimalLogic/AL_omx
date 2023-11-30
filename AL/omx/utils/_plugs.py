@@ -1,10 +1,24 @@
-# Copyright (C) Animal Logic Pty Ltd. All rights reserved.
+# Copyright © 2023 Animal Logic. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 
 import functools
-from maya import cmds
-from maya.api import OpenMaya as om2
-from AL.maya2.omx.utils import _exceptions
+
+from AL.omx.utils._stubs import cmds
+from AL.omx.utils._stubs import om2
+from AL.omx.utils import _exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +29,7 @@ def createAttributeDummy():
 
     Notes:
         Usually this temp node will need to be removed soon after the attribute is used.
-        More info in the notes for `getOrExtendMPlugArray()`.
+        More info in the notes for :func:`getOrExtendMPlugArray()`.
 
     Returns:
         om2.MObject: The MObject created.
@@ -39,8 +53,10 @@ def getOrExtendMPlugArray(arrayPlug, logicalIndex, dummy=None):
 
     Args:
         arrayPlug (om2.MPlug): A valid array plug.
+
         logicalIndex (int): The logical index.
-        dummy (None | om2.MObject): The dummy MObject that contains a 'kMessage',
+
+        dummy (None | om2.MObject, optional): The dummy MObject that contains a 'kMessage',
             createAttributeDummy() will be called to create one if it is None.
 
     Notes:
@@ -51,8 +67,7 @@ def getOrExtendMPlugArray(arrayPlug, logicalIndex, dummy=None):
         this runs with plenty elbow room around it or only once.
 
     Returns:
-        om2.MPlug: The plug at the logical index, or None if it is not a valid
-            array plug.
+        om2.MPlug: The plug at the logical index, or None if it is not a valid array plug.
     """
     cleanUpDummy = False
     if dummy is None:
@@ -94,15 +109,15 @@ def _findLeafPlug(plug, iterCount=None, maxRecursion=8, relaxed=False):
 
     Args:
         plug (om2.MPlug): the root plug to recursively walk
-        iterCount (int): this is just to ensure an iteration lock to prevent odd
+        iterCount (int, optional): this is just to ensure an iteration lock to prevent odd
                         infinite loops, something for the function, when it runs
                         recursively, to pass back to itself and increment
-        maxRecursion (int): the maximum number of recursions allowed
-        relaxed (bool): Whether we keep silent on the potential error 
+        maxRecursion (int, optional): the maximum number of recursions allowed
+        relaxed (bool, optional): Whether we keep silent on the potential error 
 
     Raises:
         StopIteration: If iteration exceeds the maxRecursion.
-        _exceptions.PlugArrayOutOfBounds: If the plug is an array plug with no elements.
+        :class:`PlugArrayOutOfBounds`: If the plug is an array plug with no elements.
 
     Returns:
         None : If there is an error (shouldn't return).
@@ -164,19 +179,20 @@ def findSubplugByName(plug, token):
     return findPlug(plugName, plug.node())
 
 
-def _findPlugOnNodeInternal(mob, plugName, networked=False, relaxed=False, dummy=None):
+def _findPlugOnNodeInternal(mob, plugName, networked=False, relaxed=False):
     """
     Args:
         mob (om2.MObject): Maya MObject for a node we want to find the plug on
         plugName (str): string for the name of the plug we want to look for. Paths supported
-        networked (bool): pass-through or emulation for Maya's argument that will
+        networked (bool, optional): pass-through or emulation for Maya's argument that will
                         ensure the only plugs returned are networked ones
-        relaxed (bool): clients of this function potentially deal with large sets of data
+        relaxed (bool, optional): clients of this function potentially deal with large sets of data
                         that might contain None, False, or something else flagging
                         an uninteresting index. Relaxed will ensure invalid mobs will
                         be silently skipped if set to True
+
     Returns:
-        MPlug: the plug found unless it outright fails.
+        om2.MPlug: the plug found unless it outright fails.
             Caller needs to ensure it's not null to know if it's valid or not
 
     Notes:
@@ -211,6 +227,7 @@ def _findPlugOnNodeInternal(mob, plugName, networked=False, relaxed=False, dummy
         # Chances are the plug is a subplug of an array, a compound,
         #  or a nesting of a combination of both
         cleanUpDummy = False
+        dummy = None
         compoundSplit = plugName.split(".")  # any compounding will be dot delimited
         currPlug = None
         firstRun = False
@@ -231,7 +248,7 @@ def _findPlugOnNodeInternal(mob, plugName, networked=False, relaxed=False, dummy
                     if not relaxed:
                         logger.error("Cannot find plug: %s", token)
                         logger.error(err)
-                        return None  # early escape
+                        return om2.MPlug()  # early escape
                 firstRun = True
 
             if aIndex is not None:  # if it's an array plug...
@@ -243,7 +260,7 @@ def _findPlugOnNodeInternal(mob, plugName, networked=False, relaxed=False, dummy
                             token,
                             dep.name(),
                         )
-                        return None
+                        return om2.MPlug()
 
                     raise RuntimeError(
                         f"findplug failed in finding array entry for plugname {plugName}"
@@ -290,18 +307,45 @@ def _findPlugOnNodeInternal(mob, plugName, networked=False, relaxed=False, dummy
 
 
 def findPlug(plugName, node=None):
-    """ Find the MPlug by name (and node)
+    """ Find the om2.MPlug by name (and node)
 
-    It allows to pass either attribute name plus node MObject
+    It allows to pass either attribute name plus node om2.MObject
     or the full plug path without a node.
 
     Args:
-        plugName (str): plugname or fullname with path
-        node Optional(MObject): node of the plug
+        plugName (str): plug name or node.attr
+        node(om2.MObject, optional): node of the plug, it is optional.
 
     Returns:
-        (MPlug) if found (None) otherwise
+        om2.MPlug if found None otherwise
     """
+    # most of time, MFnDependencyNode.findPlug() will work and be faster, but just
+    # be aware of the behavior differences between the two:
+    # 1. We need to check and return None for a plug whose node is invalid (e.g. deleted),
+    #    as MFnDependencyNode.findPlug() will still return a valid plug even when the
+    #    node has been removed, MSelectionList.getPlug() does the check for you.
+    # 2. MSelectionList supports nodeName.plugName notion, even with [] or . for array element
+    #    plug or child plug full path, MFnDependencyNode.findPlug() does not.
+    # 3. MSelectionList always returns non-networked plug, while MFnDependencyNode.findPlug()
+    #    depends on the argument you passed in.
+    # 4. MSelectionList.getPlug() will find a plug on a child shape node if such plug does not
+    #    exist on a transform, when you passed in "transformNodeName.shapeAttrName", which
+    #    doesn't sound right but client code might expect that behavior.
+
+    if node and not node.isNull() and om2.MObjectHandle(node).isValid():
+        fnDep = om2.MFnDependencyNode(node)
+        # Avoid processing child plug full path, array element, or plug on child shape.
+        if fnDep.hasAttribute(plugName):
+            try:
+                # We need to use non-network plug as you can never know if the plug
+                # will be disconnected later.
+                plug = fnDep.findPlug(plugName, False)
+                return None if plug.isNull else plug
+
+            except Exception:
+                return _findPlugOnNodeInternal(node, plugName, relaxed=True)
+
+    # Then we deal with complex plug path, e.g. compound.child, array[index], etc.
     if node:
         if node.hasFn(om2.MFn.kDagNode):
             nodeName = om2.MFnDagNode(node).fullPathName()
@@ -367,9 +411,8 @@ def plugIsValid(plug):
        Courtesy of Maya having issues when a plug;
        - can be obtained that is fully formed
        - responds to methods such as isCompound, isElement etc. 
-       - also respond negatively to isNull BUT actually has an uninitialized array in its stream and will  
-         therefore hard crash if queried for anything relating to its array properties such as numElements 
-         etc.
+       - also respond negatively to isNull BUT actually has an uninitialized array in its stream and will
+       therefore hard crash if queried for anything relating to its array properties such as numElements etc.
 
     Args:
         plug (om2.MPlug): The plug to do validity check.
@@ -446,6 +489,9 @@ def _plugLockElision(f):
     """ Internal use only. It is a decorator to enable functions operating on plugs as 
     first argument or plug keyed argument to elide eventual locks present on the plug
 
+    Args:
+        f (function): the python function to wrap.
+
     Notes:
         This requires the functor getting decorated has a argument call "plug" and "_wasLocked".
 
@@ -500,6 +546,9 @@ def iterAttributeFnTypesAndClasses():
 def attributeTypeAndFnFromPlug(plug):
     """Get the attribute type and MFn*Attribute class for the plug.
 
+    Args:
+        plug (om2.MPlug): The plug to query type and attribute functor for.
+
     Returns:
         om2.MFn.*, om2.MFn*Attribute.
     """
@@ -509,11 +558,11 @@ def attributeTypeAndFnFromPlug(plug):
     retType = om2.MFn.kAttribute
     for attrType, fn in iterAttributeFnTypesAndClasses():
         if attr.hasFn(attrType):
-            retFn = fn(plug.attribute())
+            retFn = fn(attr)
             retType = attrType
             break
     if retFn is None:
-        retFn = om2.MFnAttribute(plug.attribute())
+        retFn = om2.MFnAttribute(attr)
 
     return retType, retFn
 
@@ -530,12 +579,18 @@ def valueFromPlug(
 
     Args:
         plug (om2.MPlug): The plug to get the value from.
-        context (om2.MDGContext): The DG context to get the value for.
-        faultTolerant (bool): Whether to raise on errors or proceed silently
-        flattenComplexData (bool): Whether to convert MMatrix to list of doubles
-        returnNoneOnMsgPlug (bool): Whether we return None on message plug or the plug itself.
-        asDegrees (bool): For an angle unit attribute we return the value in degrees
+
+        context (om2.MDGContext, optional): The DG context to get the value for.
+
+        faultTolerant (bool, optional): Whether to raise on errors or proceed silently
+
+        flattenComplexData (bool, optional): Whether to convert MMatrix to list of doubles
+
+        returnNoneOnMsgPlug (bool, optional): Whether we return None on message plug or the plug itself.
+
+        asDegrees (bool, optional): For an angle unit attribute we return the value in degrees
             or in radians.
+
     Returns:
         om2.MFn.*, om2.MFn*Attribute.
     """
@@ -607,15 +662,13 @@ def valueFromPlug(
 
 
 def __num_as_float(t):
-    """
-    internal use only, solely meant for code compression
+    """Internal use only, solely meant for code compression
     """
     return t in (om2.MFnNumericData.kFloat, om2.MFnNumericData.kDouble)
 
 
 def __num_as_int(t):
-    """
-    internal use only, solely meant for code compression
+    """Internal use only, solely meant for code compression
     """
     # in order of likelyhood/speed centric
     return (
@@ -662,27 +715,29 @@ def valueAndTypesFromPlug(
     flattenComplexData=True,
     asDegrees=False,
 ):
-    """Retrieves the value, attribute functor type, and attribute type per functor for any given plug
+    """Retrieves the value, attribute functor type, and attribute type per functor for any given plug.
 
     Args:
         plug (om2.MPlug): A maya type plug of any description
-        context (om2.MDGContext): The maya context to retrieve the plug at. This isn't always applicable,
-                                  and w indicate so in the switches when it's not, but it's always accepted
-                                 When a context isn't passed the default is kNormal, which is current
-                                  context at current time
-        exclusionPredicate (function): Predicated on the attribute functor internal to the function
-                                    this enables us to filter by an internal which
-                                    preceeds the plug check stages, enabling things
-                                    such as early filtering of hidden attributes
-                                    or factory ones etc.
-        inclusionPredicate (function): Predicated on the attribute functor internal to the function
-                                    this enables us to filter by an internal which
-                                    preceeds the plug check stages, enabling things
-                                    such as early filtering by specific attribute
-                                    functor calls before choosing to opt in.
-        faultTolerant (bool): Whether to raise on errors or proceed silently
-        flattenComplexData (bool): Whether to convert MMatrix to list of doubles
-        asDegrees (bool): For an angle unit attribute we return the value in degrees
+
+        context (om2.MDGContext, optional): The maya context to retrieve the plug at. This isn't always applicable,
+            and w indicate so in the switches when it's not, but it's always accepted
+            When a context isn't passed the default is kNormal, which is current
+            context at current time.
+
+        exclusionPredicate (function, optional): Predicated on the attribute functor internal to the function
+            this enables us to filter by an internal which preceeds the plug check stages, enabling things
+            such as early filtering of hidden attributes or factory ones etc.
+
+        inclusionPredicate (function, optional): Predicated on the attribute functor internal to the function
+            this enables us to filter by an internal which preceeds the plug check stages, enabling things
+            such as early filtering by specific attribute functor calls before choosing to opt in.
+
+        faultTolerant (bool, optional): Whether to raise on errors or proceed silently.
+
+        flattenComplexData (bool, optional): Whether to convert MMatrix to list of doubles.
+
+        asDegrees (bool, optional): For an angle unit attribute we return the value in degrees
             or in radians.
 
     Returns:
@@ -1010,20 +1065,30 @@ def setValueOnPlug(
     """Set plug value using a modifier.
 
     Args:
-        plug (om2.MPlug): The plug to set to the specified value contained in the following argument
-        value: the value to set the plug to
-        exclusionPredicate (function): See valueAndTypesFromPlug
-        inclusionPredicate (function): See valueAndTypesFromPlug
-        faultTolerant (bool): Whether to raise on errors or proceed silently
-        _wasLocked (bool): internal use only, this is required for plugLock eliding
-                            functions to play nice with elision conditions, since the decorator
-                            will always run first and unlock the plug, and therefore has to be
-                            able to signal the wrapped function of the previous state of the plug
-                            for both the check AND restoration of the lock before an eventual exception
-        modifier (om2.MDGModifier): to support modifier for undo/redo purpose.
-        doIt (bool): True means modifier.doIt() will be called immediately to apply the plug value change.
-                        False enable you to defer and call modifier.doIt() later in one go.
-        asDegrees (bool): When it is an angle unit attribute, if this is True than we take the 
+        plug (om2.MPlug): The plug to set to the specified value contained in the following argument.
+
+        value (any): the value to set the plug to
+
+        elideLock (bool, optional): Whether we unlock the plug (only) during value setting.
+
+        exclusionPredicate (function, optional): See valueAndTypesFromPlug
+
+        inclusionPredicate (function, optional): See valueAndTypesFromPlug
+
+        faultTolerant (bool, optional): Whether to raise on errors or proceed silently
+
+        _wasLocked (bool, optional): internal use only, this is required for plugLock eliding
+            functions to play nice with elision conditions, since the decorator
+            will always run first and unlock the plug, and therefore has to be
+            able to signal the wrapped function of the previous state of the plug
+            for both the check AND restoration of the lock before an eventual exception
+
+        modifier (om2.MDGModifier, optional): to support modifier for undo/redo purpose.
+
+        doIt (bool, optional): True means modifier.doIt() will be called immediately to apply the plug value change.
+            False enable you to defer and call modifier.doIt() later in one go.
+
+        asDegrees (bool, optional): When it is an angle unit attribute, if this is True than we take the 
             value as degrees, otherwise as radians. This flag has no effect
             when it is not an angle unit attribute.
 
@@ -1049,22 +1114,11 @@ def setValueOnPlug(
             "invalid plug found before trying to set value on it from setValueOnPlug",
         )
 
-    if plug.isNull:
+    if not elideLock and _wasLocked:
         if faultTolerant:
             return None
-        plugname = (
-            "failed to retrieve name from plug, argument might not even be a plug"
-        )
-        try:
-            plugname = plug.partialName(useLongNames=True)
-        except Exception:  # yeah, it's an except all, but we don't want errorception here.
-            pass
 
-        raise RuntimeError(f"Plug {plugname}")
-
-    if not elideLock and _wasLocked:
-        # @todo: add a debug or something?
-        return None
+        raise _exceptions.PlugLockedForEditError(plug)
 
     attrType, fn = attributeTypeAndFnFromPlug(plug)
     if exclusionPredicate(fn) or not inclusionPredicate(fn):
@@ -1085,7 +1139,7 @@ def setValueOnPlug(
                 if faultTolerant:
                     return None
                 raise RuntimeError(
-                    "value is a seuqence of length different than the length of the array / compound children length of the plug it's trying to be set on"
+                    "value is a sequence of length different than the length of the array / compound children length of the plug it's trying to be set on"
                 )
 
         for i in range(count):

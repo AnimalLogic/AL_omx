@@ -1,0 +1,4 @@
+recursive-include docs *
+include reformat.*
+global-exclude *.pyc build/
+exclude AL/omx/package.py AL/omx/CMakeLists.txt
