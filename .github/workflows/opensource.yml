@@ -1,0 +1,29 @@
+name: Publish To OpenSource
+on:
+  push:
+    branches:
+      - 'opensource'
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+ 
+      - name: Check out Internal Repository
+        uses: actions/checkout@v3
+      - name: Push to public repository
+        env:
+          SSH_PRIVATE_KEY: ${{secrets.SSH_PRIVATE_KEY}}
+        run: |
+          mkdir -p /home/runner/.ssh
+          sudo chmod 700 /home/runner/.ssh/
+          echo "$SSH_PRIVATE_KEY" > /home/runner/.ssh/private.key
+          sudo chmod 600 /home/runner/.ssh/private.key
+          eval `ssh-agent -s`
+          ssh-add /home/runner/.ssh/private.key
+          
+          git fetch --unshallow
+          git remote add opensource_remote git@github.com:AnimalLogic/AL_omx.git
+          git remote -v
+          git checkout opensource
+          git status
+          git push -f  opensource_remote opensource:animallogic
