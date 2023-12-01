@@ -56,7 +56,7 @@ def isInsideMaya():
         bool: True if inside, False otherwise.
     """
     global cmds
-    return hasattr(cmds, "loadPlugin") and not isinstance(cmds, _MayaStub)
+    return hasattr(cmds, "loadPlugin") and not isinstance(cmds, MagicMock)
 
 
 def _importStandardMayaModules():
