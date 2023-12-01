@@ -1,7 +1,8 @@
 Generate |project| Documentation Locally 
 ============================================
 
-The online version of |project| documentation is always available on here (ToBeAdded).
+The |project| `online documentation <https://animallogic.github.io/AL_omx/>`_ is always available.
+
 The documentation source files are also included with each distribution, which means you can generate HTML documentation from them yourself locally.
 
 **To generate the document:**
@@ -22,22 +23,21 @@ Install using pip is suggested, but keep in mind that you can not use mayapy for
     pip install sphinx_rtd_theme
     pip install sphinx-copybutton
 
-4. Add the root directory of |project| in your `PYTHONPATH` so that the document generator can import `AL.omx` for API documentation auto-generation.
-You can do so by simply installing |project| using pip install:
+4. Add the root directory of |project| in your ``PYTHONPATH`` so that the document generator can import ``AL.omx`` for API documentation auto-generation.
+You can simply append the root directory of |project| to the environment variable ``PYTHONPATH``:
+
+For Linux and MacOSX:
 
 .. code:: shell
     
-    pip install AL_omx
-
-Alternatively, you can simply set the environment variable instead:
-
-.. code:: shell
-    
-    # for Linux and MacOSX:
     export PYTHONPATH="$PYTHONPATH:path/to/omxRootDir"
 
-    # for Windows:
+For Windows:
+
+.. code:: batch
+
     set PYTHONPATH=%PYTHONPATH%;path/to/omxRootDir
+
 
 5. Run make in the doc folder:
 
@@ -51,10 +51,5 @@ Alternatively, you can simply set the environment variable instead:
     # for Windows:
     make.bat html
 
-6. The generated documentation will be in `path/to/omxRootDir/docs/build` folder. Load the `index.html` in your web browser
-to use the documentation. Uninstall |project| if you installed it with `pip install` as it will do nothing in vanilla Python 
-beyond the Maya environment. Skip this step if you did it by setting the `PYTHONPATH` environment variable.
-
-.. code:: shell
-    
-    pip uninstall AL_omx
+6. The generated documentation will be in ``path/to/omxRootDir/docs/build`` folder. Load the ``index.html`` in your web browser
+to use the documentation. 
