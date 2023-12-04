@@ -1,0 +1,16 @@
+name: Code Coverage
+
+on: [push, pull_request]
+
+jobs:
+  build-python3-linux:
+      runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          python-version: [3.7]
+          
+      steps:
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
