@@ -16,34 +16,6 @@
 fallback to stub mode. 
 """
 
-from unittest.mock import MagicMock
-
-
-class _OpenMaya(MagicMock):
-    """A dummy stub object for maya.api.OpenMaya to silence the module import error when 
-    importing AL.omx outside the Autodesk Maya environment; mainly for API document 
-    generation purpose.
-    """
-
-    class MPxCommand:
-        """A dummy for MPxCommand inheritance to avoid python import error.
-        """
-
-        pass
-
-    class MPlug:
-        """A dummy for MPlug inheritance to avoid python import error.
-        """
-
-        pass
-
-    class MDagModifier:
-        """A dummy for MDagModifier inheritance to avoid python import error.
-        """
-
-        pass
-
-
 cmds = None
 om2 = None
 om2anim = None
@@ -56,7 +28,7 @@ def isInsideMaya():
         bool: True if inside, False otherwise.
     """
     global cmds
-    return hasattr(cmds, "loadPlugin") and not isinstance(cmds, MagicMock)
+    return hasattr(cmds, "loadPlugin") and type(cmds).__name__ == "module"
 
 
 def _importStandardMayaModules():
@@ -91,6 +63,33 @@ def _importStandaloneMayaModules():
 
 
 def _useDummyMayaModules():
+    # the import has to be here as some Maya version errors when importing it.
+    from unittest.mock import MagicMock
+
+    class _OpenMaya(MagicMock):
+        """A dummy stub object for maya.api.OpenMaya to silence the module import error when 
+        importing AL.omx outside the Autodesk Maya environment; mainly for API document 
+        generation purpose.
+        """
+
+        class MPxCommand:
+            """A dummy for MPxCommand inheritance to avoid python import error.
+            """
+
+            pass
+
+        class MPlug:
+            """A dummy for MPlug inheritance to avoid python import error.
+            """
+
+            pass
+
+        class MDagModifier:
+            """A dummy for MDagModifier inheritance to avoid python import error.
+            """
+
+            pass
+
     global cmds
     global om2
     global om2anim
