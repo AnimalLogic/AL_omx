@@ -1,0 +1,6 @@
+ignore:
+  - "docs"
+  - "__init__.py"
+  - "reformat.py"
+  - "setup.py"
+  
