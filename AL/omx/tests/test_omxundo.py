@@ -17,7 +17,6 @@ import logging
 import unittest
 
 from AL.omx.utils._stubs import cmds
-from maya import cmds
 from AL import omx
 from AL.omx.utils import _contexts as omu_contexts
 
