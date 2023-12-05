@@ -3,8 +3,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 
-AL_OMX is a open-source library, that provides a thin wrapper around Maya OM2 which makes OM2 more user-friendly but still retain the API's performance.
-
+AL_OMX is an open-source library that provides a thin wrapper around Maya OM2 which makes it easy to manipulate nodes, attributes and connections while retaining the API's performance.
 
 ## Documentation
 

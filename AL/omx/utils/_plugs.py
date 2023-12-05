@@ -995,7 +995,6 @@ def valueAndTypesFromPlug(
             liveMayaArray = fnData.array()
             return [[p.x, p.y, p.z] for p in liveMayaArray], attrType, t
         if t == om2.MFnData.kPointArray:  # point array
-            #           This is an absolutely terrifying attribute.
             #           For performance reasons it will handle things around by reference.
             if context != om2.MDGContext.kNormal:
                 # @TODO: raise custom error if not fault tolerant

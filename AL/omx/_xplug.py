@@ -14,8 +14,6 @@
 
 import logging
 
-
-from AL.omx.utils._stubs import cmds
 from AL.omx.utils._stubs import om2
 from AL.omx.utils import _plugs
 from AL.omx.utils import _exceptions
