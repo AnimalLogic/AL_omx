@@ -18,6 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install coverage
+          pip install pytest
       - name: Test with pytest
         run: |
           coverage run -m pytest -v AL/omx/tests        
