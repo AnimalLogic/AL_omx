@@ -15,9 +15,9 @@ Cookbook
 
    In this cookbook, we always refer ``maya.api.OpenMaya`` as ``om2``, and ``AL.omx`` as ``omx``.
 
-   .. seealso::
-      :ref:`immediate_mode`
-         The execute mode of omx dictates whether you need to call :func:`AL.omx.doIt()` manually.
+.. seealso::
+    :ref:`immediate_mode`
+        The execute mode of omx dictates whether you need to call :func:`AL.omx.doIt()` manually.
    
 
 Create DagNode
@@ -119,6 +119,8 @@ and you can use ``XPlug`` whenever an ``om2.MPlug`` is needed. Refer to :class:`
 
 Connection
 ---------------------------
+The connection methods on ``XPlug`` will unlock the destination plug if it is locked, and disconnect it if it's already connected when the argument `force=True`.
+
 .. code:: python
 
     persp = omx.XNode("persp")
@@ -148,6 +150,8 @@ Read the :doc:`../advanced/undoability` document to know how undo & redo actuall
 
 Getting om2.MFn Functors
 ---------------------------
+``XNode`` comes with convenient methods to get the basic or best ``om2.MFn`` functors.
+
 .. code:: python
 
     # retrieve basic functor, om2.MFnDependencyNode for DG node and om2.MFnDagNode for DAG node:
@@ -159,9 +163,9 @@ Getting om2.MFn Functors
     print("basic functor for camera:", omx.XNode("perspShape").bestFn())
 
 
-Stringfication
+Stringification
 -------------------
-:class:`AL.omx.XNode` and :class:`AL.omx.XPlug` both support stringfication, when used in ``print()`` or logger, it will be converted to a nice-formed string.
+:class:`AL.omx.XNode` and :class:`AL.omx.XPlug` both support stringification, when used in ``print()`` or logger, it will be converted to a nice-formed string.
 
 .. code:: python
 

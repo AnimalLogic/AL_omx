@@ -6,13 +6,16 @@ Undoability
 Automatic Undo & Manual Undo
 --------------------------------------------
 There are two types of undoability in omx: 
-1. When using omx for scripting, e.g. creating nodes using ``omx.create*Node``, calling methods from :class:`AL.omx.XNode`
+
+**1. Automatic Undo:**
+When using omx for scripting, e.g. creating nodes using ``omx.create*Node``, calling methods from :class:`AL.omx.XNode`
 , :class:`AL.omx.XPlug` or call :class:`AL.omx.XModifier` method from :func:`AL.omx.currentModifier()` instead of :func:`AL.omx.newModifier()`
 for editing, one execution will be one undo item in Maya. 
 
 After execution, you simply use `ctrl+Z` and `shift+Z` to undo and redo.
 
-2. When using omx within your tools or framework, where you want to manage undo and redo yourself, you will need
+**2. Manual Undo:**
+When using omx within your tools or framework, where you want to manage undo and redo yourself, you will need
 to ensure you are using non-immediate :class:`AL.omx.XModifier`, and call :func:`AL.omx.XModifier.doIt()`, :func:`AL.omx.XModifier.undoIt()`
 manually in the proper places.
 
