@@ -28,7 +28,7 @@ def isInsideMaya():
         bool: True if inside, False otherwise.
     """
     global cmds
-    return hasattr(cmds, "loadPlugin") and type(cmds).__name__ == "module"
+    return type(cmds).__name__ == "module"
 
 
 def _importStandardMayaModules():
