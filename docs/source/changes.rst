@@ -1,6 +1,16 @@
 Change Logs
 ================
 
+1.0.4
+--------------
+Fixes
+    - Fix issues caused by omx import in non-Maya environment.
+    
+Improvements
+    - Update Contribution and Feedback section for documentation.
+    - More contents added to README.md.
+
+
 1.0.3
 --------------
 Fixes
