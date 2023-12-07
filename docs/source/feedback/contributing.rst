@@ -2,8 +2,8 @@ Contributor License Agreement
 =====================================
 Before contributing code to |project|, we ask that you sign a Contributor License Agreement (CLA).  At the root of the repo you can find the two possible CLAs:
 
-- `AL_omx_Corporate_CLA.pdf <https://github.com/AnimalLogic/AL_omx/AL_omx_Corporate_CLA.pdf>`_ please sign this one for corporate use
-- `AL_omx_Individual_CLA.pdf <https://github.com/AnimalLogic/AL_omx/AL_omx_Individual_CLA.pdf>`_ please sign this one if you're an individual contributor
+- `AL_omx_Corporate_CLA.pdf <https://github.com/AnimalLogic/AL_omx/blob/main/AL_omx_Corporate_CLA.pdf>`_ please sign this one for corporate use
+- `AL_omx_Individual_CLA.pdf <https://github.com/AnimalLogic/AL_omx/blob/main//AL_omx_Individual_CLA.pdf>`_ please sign this one if you're an individual contributor
 
 Once your CLA is signed, send it to opensource@al.com.au (please make sure to include your github username) and wait for confirmation that we've received it.  After that, you can submit pull requests.
 
