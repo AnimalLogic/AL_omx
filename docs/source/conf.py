@@ -18,7 +18,7 @@ import sys
 
 # -- Project information -----------------------------------------------------
 
-project = "AL_OMX"
+project = "AL_omx"
 copyright = "Animal Logic Pty Ltd."
 author = "Animal Logic"
 license = "Apache License Version 2.0"

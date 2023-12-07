@@ -20,25 +20,25 @@ Now to install |project| with pip in Windows, you just do:
 
 .. code:: shell
 
-    mayapy -m pip install AL_OMX
+    mayapy -m pip install AL_omx
 
 In Linux and macOS:
 
 .. code:: shell
 
-    sudo ./mayapy -m pip install AL_OMX
+    sudo ./mayapy -m pip install AL_omx
 
 To uninstall, do this in Windows:
 
 .. code:: console
 
-    mayapy -m pip uninstall AL_OMX
+    mayapy -m pip uninstall AL_omx
 
 In Linux and macOS:
 
 .. code:: shell
 
-    sudo ./mayapy -m pip uninstall AL_OMX
+    sudo ./mayapy -m pip uninstall AL_omx
 
 
 .. note::

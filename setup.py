@@ -38,7 +38,7 @@ def version():
 
 
 setup(
-    name="AL_OMX",
+    name="AL_omx",
     version=version(),
     description="A fast and user-friendly library built on top of Autodesk Maya's OpenMaya library.",
     long_description=readme(),
