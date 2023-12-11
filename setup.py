@@ -48,12 +48,13 @@ setup(
     author_email="",
     license="Apache License, Version 2.0",
     classifiers=[
-        "License :: OSI Approved :: Apache License, Version 2.0",
+        "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Topic :: Software Development",
-        "Topic :: Software Development :: DCC",
+        "Topic :: Software Development :: Libraries",
         "Intended Audience :: Developers",
     ],
     packages=[
