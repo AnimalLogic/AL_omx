@@ -1,7 +1,8 @@
 # AL_omx
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-
+![PyPi](https://img.shields.io/pypi/v/AL_omx)
+![PythonVersion](https://img.shields.io/pypi/pyversions/AL_omx)
 
 `AL_omx` is an open-source library that provides a thin wrapper around Maya OM2 which makes it easy to manipulate nodes, attributes and connections while retaining the API's performance:  
 - User-friendly entry point into Maya’s native [om2 (maya.api.OpenMaya)](https://help.autodesk.com/view/MAYAUL/2022/ENU/?guid=Maya_SDK_py_ref_namespace_open_maya_html) API .
@@ -12,7 +13,9 @@
 
 ## QuickStart
 
-Install `AL_omx` using `mayapy -m pip install AL_omx`, or by adding the root directory to `sys.path`. For more information on the installation, check out [here](https://animallogic.github.io/AL_omx/getting_started/installation.html).
+Install `AL_omx` using `mayapy -m pip install AL_omx`, or by adding the root directory to `sys.path`. The url for `PyPi` package is [here](https://pypi.org/project/AL_omx/).
+
+For more information on the installation, check out [here](https://animallogic.github.io/AL_omx/getting_started/installation.html).
 
 The requirements of `AL_omx`:
 
