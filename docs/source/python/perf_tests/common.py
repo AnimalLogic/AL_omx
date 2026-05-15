@@ -29,7 +29,9 @@ class PerfMeasurement:
         self._label = label
         self._gap = 0.0
 
-    def __enter__(self,):
+    def __enter__(
+        self,
+    ):
         self._start = time.time()
         self._gap = 0.0
 
@@ -51,7 +53,9 @@ class TotalPerfMeasurement:
         self._measurers.append(measurement)
         return measurement
 
-    def __enter__(self,):
+    def __enter__(
+        self,
+    ):
         print("-" * 20)
         return self
 

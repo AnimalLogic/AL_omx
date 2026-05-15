@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 
 import unittest
 import logging
@@ -263,6 +264,77 @@ class XNodeCase(unittest.TestCase):
         fn = timeNode.bestFn()
         self.assertIsInstance(fn, om2.MFnDependencyNode)
 
+    def testDagFn(self):
+        """Make sure when we get Maya functor from XNode, we get a best working function set with
+        a correct MDagPath attached.
+        """
+        points = [[i * 0.1] * 3 for i in range(4)]
+        testPoint = om2.MPoint(0.0, 0.0, 0.0)
+        curveTransformName = cmds.curve(d=3, p=points, k=[0, 0, 0, 1, 1, 1])
+        groupName = cmds.group()
+        transformNode = omx.XNode(curveTransformName)
+        fn = transformNode.bestFn()
+        self.assertIsInstance(fn, om2.MFnTransform)
+        child = fn.child(0)
+
+        # for xnode constructed using om2.MObject:
+        curveNode = omx.XNode(child)
+        expectedDagPath = (
+            curveNode.basicFn().dagPath()
+        )  # this will error if we attach returned fn with MObject.
+        self.assertTrue(
+            curveNode.bestFn().closestPoint(testPoint, space=om2.MSpace.kWorld)
+        )
+
+        # still works for duplicated name with normal copy:
+        cmds.duplicate(groupName, rr=True)
+        self.assertTrue(
+            curveNode.bestFn().closestPoint(testPoint, space=om2.MSpace.kWorld)
+        )
+
+        # still works for instanced copy:
+        curveShapeName = str(curveNode)
+        curveTransformName = str(transformNode)
+        instancedTransformName = cmds.duplicate(
+            curveTransformName, instanceLeaf=True, rr=True
+        )[0]
+        self.assertTrue(
+            curveNode.bestFn().closestPoint(testPoint, space=om2.MSpace.kWorld)
+        )
+
+        # test with xnode reconstruction with instanced shape
+        curveNode = omx.XNode(curveShapeName)
+        self.assertEqual(curveNode.basicFn().dagPath(), expectedDagPath)
+        self.assertTrue(
+            curveNode.bestFn().closestPoint(testPoint, space=om2.MSpace.kWorld)
+        )
+
+        instancedCurveName = cmds.listRelatives(
+            instancedTransformName, s=True, fullPath=True
+        )[0]
+        instancedCurveNode = omx.XNode(instancedCurveName)
+        # the MDagPaths are different, but the MObject is the same.
+        self.assertEqual(instancedCurveNode.object(), curveNode.object())
+        instancedDagPath = instancedCurveNode.basicFn().dagPath()
+        self.assertNotEqual(instancedDagPath, expectedDagPath)
+        # but the function still working:
+        self.assertTrue(
+            curveNode.bestFn().closestPoint(testPoint, space=om2.MSpace.kWorld)
+        )
+
+        # construct using MDagPath should also work
+        originalCurveNode = omx.XNode(expectedDagPath)
+        self.assertEqual(originalCurveNode.basicFn().dagPath(), expectedDagPath)
+        self.assertTrue(
+            originalCurveNode.bestFn().closestPoint(testPoint, space=om2.MSpace.kWorld)
+        )
+
+        # the only limitation is, if you now construct a XNode using an instanced MObject,
+        # just as shown in the commented code below, XNode will construct MFn using MObject,
+        # which means some call on these DAG MFn returned by XNode.bestFn()/basicFn()
+        # won't work:
+        # testCurveNode = omx.XNode(instancedCurveNode.object())
+
     def testUndoContext(self):
         transform1 = omx.createDagNode("transform", nodeName="myTransform1")
         self.assertTrue(cmds.objExists("myTransform1"))
@@ -513,3 +585,201 @@ class XNodeCase(unittest.TestCase):
             mod.doIt()
             fakeLog = str(target)
             self.assertEqual(fakeLog, ":pCube1(invalid)")
+
+
+class XNodePlugIterationCase(unittest.TestCase):
+    app = "maya"
+
+    def setUp(self):
+        cmds.file(new=True, f=True)
+        transform = cmds.group(em=True, name="testTransform")
+        self.transformNode = omx.XNode(transform)
+        self.transformNode.ry.isLocked = True
+        self.transformNode.sy.connectTo(self.transformNode.sz)
+
+    def tearDown(self):
+        cmds.file(new=True, f=True)
+
+    def testIterXPlugsByType(self):
+        # No type filter:
+        allPlugs = list(self.transformNode.iterXPlugs())
+        totalLen = len(allPlugs)
+        self.assertTrue(totalLen > 40)
+
+        # Filter to numeric plugs
+        numericPlugs = list(
+            self.transformNode.iterXPlugs(attrType=omx.XAttrType.NUMERIC)
+        )
+        numericLen = len(numericPlugs)
+        self.assertTrue(20 < numericLen < totalLen)
+
+        # Filter to unit plugs
+        unitPlugs = list(self.transformNode.iterXPlugs(attrType=omx.XAttrType.UNIT))
+        unitLen = len(unitPlugs)
+        self.assertTrue(15 < unitLen < totalLen)
+
+        # Test angle plugs:
+        radianPlugs = list(self.transformNode.iterXPlugs(attrType=omx.XAttrType.ANGLE))
+        radianLen = len(radianPlugs)
+        self.assertTrue(12 <= radianLen < totalLen)
+        for radianPlug in radianPlugs:
+            self.assertTrue(radianPlug in unitPlugs)
+        self.assertTrue(self.transformNode.rotateX in radianPlugs)
+
+        # Test typed plugs:
+        typedPlugs = list(self.transformNode.iterXPlugs(attrType=omx.XAttrType.TYPED))
+        typedLen = len(typedPlugs)
+        self.assertTrue(15 < typedLen < totalLen)
+        self.assertTrue(self.transformNode.wm in typedPlugs)
+
+        # Test message plugs:
+        messagePlugs = list(
+            self.transformNode.iterXPlugs(attrType=omx.XAttrType.MESSAGE)
+        )
+        messageLen = len(messagePlugs)
+        self.assertTrue(messageLen >= 5)
+        self.assertTrue(self.transformNode.message in messagePlugs)
+
+        # Test Enum plugs:
+        enumPlugs = list(self.transformNode.iterXPlugs(attrType=omx.XAttrType.ENUM))
+        enumLen = len(enumPlugs)
+        self.assertTrue(enumLen >= 10)
+        self.assertTrue(self.transformNode.nodeState in enumPlugs)
+
+        # Test multiple types:
+        enumOrMessagePlugs = list(
+            self.transformNode.iterXPlugs(
+                attrType=omx.XAttrType.ENUM | omx.XAttrType.MESSAGE
+            )
+        )
+        self.assertEqual(len(enumOrMessagePlugs), enumLen + messageLen)
+        for plug in enumOrMessagePlugs:
+            self.assertTrue(plug in enumPlugs or plug in messagePlugs)
+
+    def testIterXPlugsByState(self):
+        keyablePlugs = list(
+            self.transformNode.iterXPlugs(states=omx.XPlugState.KEYABLE)
+        )
+        self.assertEqual(len(keyablePlugs), 10)
+        self.assertTrue(self.transformNode.tx in keyablePlugs)
+        self.assertTrue(self.transformNode.ry in keyablePlugs)
+        self.assertTrue(self.transformNode.sz in keyablePlugs)
+        self.assertTrue(self.transformNode.v in keyablePlugs)
+
+        lockedPlugs = list(self.transformNode.iterXPlugs(states=omx.XPlugState.LOCKED))
+        self.assertEqual(len(lockedPlugs), 1)
+        self.assertTrue(self.transformNode.ry in lockedPlugs)
+
+        connectedPlugs = list(
+            self.transformNode.iterXPlugs(states=omx.XPlugState.SOURCE_DEST)
+        )
+        sourcePlugs = list(self.transformNode.iterXPlugs(states=omx.XPlugState.SOURCE))
+        destinationPlugs = list(
+            self.transformNode.iterXPlugs(states=omx.XPlugState.DESTINATION)
+        )
+        self.assertEqual(len(connectedPlugs), len(destinationPlugs) + len(sourcePlugs))
+        self.assertTrue(self.transformNode.sy in connectedPlugs)
+        self.assertTrue(self.transformNode.sz in connectedPlugs)
+        self.assertTrue(self.transformNode.sy in sourcePlugs)
+        self.assertTrue(self.transformNode.sz in destinationPlugs)
+
+    def testIterXPlugsByMultipleStates(self):
+        # Get all keyable and settable plugs
+        self.transformNode.tx.isKeyable = False
+        self.transformNode.tx.isChannelBox = True
+
+        # omx.XPlugState.KEYABLE|omx.XPlugState.CHANNELBOX means omx.XPlugState.VISIBLE,
+        # but here we just demonstrate the support of bitwise OR for state filtering.
+        keyableSettablePlugs = list(
+            self.transformNode.iterXPlugs(
+                states=(
+                    omx.XPlugState.SETTABLE,
+                    omx.XPlugState.KEYABLE | omx.XPlugState.CHANNELBOX,
+                )
+            )
+        )
+        self.assertEqual(len(keyableSettablePlugs), 8)
+        self.assertTrue(self.transformNode.tx in keyableSettablePlugs)
+        self.assertFalse(self.transformNode.ry in keyableSettablePlugs)
+        self.assertFalse(self.transformNode.sz in keyableSettablePlugs)
+
+        # Get all connected and keyable plugs
+        connectedKeyablePlugs = list(
+            self.transformNode.iterXPlugs(
+                states=(omx.XPlugState.DESTINATION, omx.XPlugState.KEYABLE)
+            )
+        )
+        self.assertEqual(connectedKeyablePlugs, [self.transformNode.sz])
+
+        # Get all locked and keyable plugs
+        lockedKeyablePlugs = list(
+            self.transformNode.iterXPlugs(
+                states=(omx.XPlugState.LOCKED, omx.XPlugState.KEYABLE)
+            )
+        )
+        self.assertEqual(lockedKeyablePlugs, [self.transformNode.ry])
+
+    def testIterXPlugsByTypeAndState(self):
+        # Get all keyable angle plugs
+        rotatePlugs = list(
+            self.transformNode.iterXPlugs(
+                attrType=omx.XAttrType.ANGLE,
+                states=omx.XPlugState.KEYABLE,
+            )
+        )
+        self.assertEqual(len(rotatePlugs), 3)
+        self.assertTrue(self.transformNode.rx in rotatePlugs)
+        self.assertTrue(self.transformNode.ry in rotatePlugs)
+        self.assertTrue(self.transformNode.rz in rotatePlugs)
+
+        # Get all settable and visible plugs:
+        settableVisiblePlugs = list(
+            self.transformNode.iterXPlugs(
+                states=omx.XPlugState.VISIBLE,
+                predicate=lambda p: omx.XPlugState.SETTABLE.matches(p),
+            )
+        )
+        self.assertTrue(self.transformNode.tx in settableVisiblePlugs)
+        self.assertFalse(self.transformNode.ry in settableVisiblePlugs)
+        self.assertFalse(self.transformNode.sz in settableVisiblePlugs)
+
+        # Get all unsettable but visible plugs:
+        unsettableVisiblePlugs = list(
+            self.transformNode.iterXPlugs(
+                states=omx.XPlugState.VISIBLE,
+                predicate=lambda p: omx.XPlugState.UNSETTABLE.matches(p),
+            )
+        )
+        self.assertFalse(self.transformNode.tx in unsettableVisiblePlugs)
+        self.assertTrue(self.transformNode.ry in unsettableVisiblePlugs)
+        self.assertTrue(self.transformNode.sz in unsettableVisiblePlugs)
+
+        # Get all translate plugs:
+        translatePlugs = list(
+            self.transformNode.iterXPlugs(
+                attrType=omx.XAttrType.DISTANCE,
+                states=omx.XPlugState.VISIBLE,
+            )
+        )
+        self.assertTrue(len(translatePlugs) == 3)
+        self.assertTrue(self.transformNode.tx in translatePlugs)
+        self.assertTrue(self.transformNode.ty in translatePlugs)
+        self.assertTrue(self.transformNode.tz in translatePlugs)
+
+    def testIterDynamicXPlugs(self):
+        # Get Dynamic plugs:
+        self.assertFalse(
+            list(self.transformNode.iterXPlugs(states=omx.XPlugState.DYNAMIC))
+        )
+        # Now add dynamic attr and test again
+        attrFn = om2.MFnNumericAttribute()
+        dynAttrName = "dynamicAttr"
+        attrMOb = attrFn.create(dynAttrName, dynAttrName, om2.MFnNumericData.kFloat)
+        mod = omx.currentModifier()
+        mod.addAttribute(self.transformNode, attrMOb)
+        omx.doIt()
+        dynamicPlugs = list(
+            self.transformNode.iterXPlugs(states=omx.XPlugState.DYNAMIC)
+        )
+        self.assertTrue(len(dynamicPlugs) == 1)
+        self.assertTrue(str(dynamicPlugs[0]) == f"{self.transformNode}.{dynAttrName}")

@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 
+import logging
+import enum
 import functools
 
 from AL.omx.utils._stubs import cmds
@@ -21,6 +22,381 @@ from AL.omx.utils._stubs import om2
 from AL.omx.utils import _exceptions
 
 logger = logging.getLogger(__name__)
+
+
+class XPlugState(enum.IntFlag):
+    """A high-level state of a XPlug in the OMX system.
+
+    Args:
+        enum (int | XPlugState): the plug state.
+    """
+
+    KEYABLE = enum.auto()
+    LOCKED = enum.auto()
+    #: Those visible in the channel box but may not be keyable.
+    CHANNELBOX = enum.auto()
+    #: All the plugs that are visible in the channel box.
+    VISIBLE = KEYABLE | CHANNELBOX
+
+    #: The plug is not locked, and the value can be changed by user.
+    SETTABLE = enum.auto()
+
+    #: The plug that connects to and controls other plugs.
+    SOURCE = enum.auto()
+    #: The plug that are connected and controlled by another plug.
+    DESTINATION = enum.auto()
+    #: We avoid using ``CONNECTED`` as it is ambiguous, because the user might think
+    #: it means the plug is connected, but technically it means either connected or connect to others.
+    SOURCE_DEST = DESTINATION | SOURCE
+
+    ARRAY = enum.auto()
+    ELEMENT = enum.auto()
+
+    COMPOUND = enum.auto()
+    CHILD = enum.auto()
+
+    #: All the user added attributes.
+    DYNAMIC = enum.auto()
+    #: All the attributes come with the MPXNode definition.
+    STATIC = enum.auto()
+
+    NETWORKED = enum.auto()
+    PROCEDURAL = enum.auto()
+    PROXY = enum.auto()
+
+    ALL = enum.auto()
+
+    # The reversed states. Cannot use the bitwise NOT (~) operator as it mess up auto()
+    # and also we don't want things like bool(INVISIBLE & NONNETWORKED) to be True
+    INVISIBLE = enum.auto()
+    UNSETTABLE = enum.auto()
+    UNCONNECTED = enum.auto()
+    NONNETWORKED = enum.auto()
+
+    @classmethod
+    def matchAll(cls, states, plug):
+        """Check if the plug has all the states.
+
+        Args:
+            states (:class:`omx.XPlugState` | list[:class:`omx.XPlugState`]): The states to check.
+            Returns False immediately if any one of the states do not match.
+
+            plug (:class:`om2.MPlug` | :class:`omx.XPlug`): The plug to check.
+
+        Returns:
+            bool: True if the plug has all the states, False otherwise.
+        """
+        if not plug or plug.isNull:
+            return False
+
+        if isinstance(states, cls):
+            return states.matches(plug)
+
+        for state in states:
+            if state == cls.ALL:
+                continue
+
+            if not state.matches(plug):
+                return False
+
+        return True
+
+    def matches(self, plug):
+        """Check if the plug has the state.
+
+        Args:
+            plug (:class:`om2.MPlug` | :class:`omx.XPlug`): The plug to check.
+
+        Returns:
+            bool: True if the plug has the state, False otherwise.
+        """
+        if not plug or plug.isNull:
+            return False
+
+        if self == self.ALL:
+            return True
+
+        # Now rely on bits:
+        if (self & self.KEYABLE) and plug.isKeyable:
+            return True
+
+        if (self & self.LOCKED) and plug.isLocked:
+            return True
+
+        if (self & self.CHANNELBOX) and plug.isChannelBox:
+            return True
+
+        if (self & self.SOURCE) and plug.isSource:
+            return True
+
+        if (self & self.DESTINATION) and plug.isDestination:
+            return True
+
+        if (self & self.INVISIBLE) and not (plug.isChannelBox or plug.isKeyable):
+            return True
+
+        if (self & self.UNCONNECTED) and not plug.isConnected:
+            return True
+
+        if (
+            self & self.UNSETTABLE
+        ) and plug.isFreeToChange() == om2.MPlug.kNotFreeToChange:
+            return True
+
+        if (
+            self & self.SETTABLE
+        ) and plug.isFreeToChange() != om2.MPlug.kNotFreeToChange:
+            return True
+
+        if (self & self.ARRAY) and plug.isArray:
+            return True
+
+        if (self & self.ELEMENT) and plug.isElement:
+            return True
+
+        if (self & self.COMPOUND) and plug.isCompound:
+            return True
+
+        if (self & self.CHILD) and plug.isChild:
+            return True
+
+        if (self & self.DYNAMIC) and plug.isDynamic:
+            return True
+
+        if (self & self.STATIC) and not plug.isDynamic:
+            return True
+
+        if (self & self.NETWORKED) and plug.isNetworked:
+            return True
+
+        if (self & self.NONNETWORKED) and not plug.isNetworked:
+            return True
+
+        if (self & self.PROCEDURAL) and plug.isProcedural:
+            return True
+
+        if (self & self.PROXY) and plug.isProxy:
+            return True
+
+        return False
+
+
+class XAttrType(enum.IntFlag):
+    """A high-level type of a XPlug attribute in the OMX system.
+
+    Args:
+        enum (int, XAttrType): the enum value.
+
+    Notes:
+        Do not store and use the integer values of these constants directly,
+        as they are not guaranteed unchanged in future versions.
+        Also, it simplifies all the type constants defined in Maya API and provides
+        a set of high-level enums whose values can be map to multiple constants in
+        :class:`om2.MFnData.Type`, :class:`om2.MFnUnitAttribute.Type`, :class:`om2.MFnNumericData.Type`,
+        etc.
+    """
+
+    # Scalar attributes
+    BOOL = enum.auto()
+    BYTE = enum.auto()
+    CHAR = enum.auto()
+    SHORT = enum.auto()
+
+    #: INT also includes INT, LONG and INT64, as they are all int in Python.
+    INT = enum.auto()
+    FLOAT = enum.auto()
+    DOUBLE = enum.auto()
+    FLOATING = FLOAT | DOUBLE
+    ADDR = enum.auto()
+
+    # Unit attributes
+    ANGLE = enum.auto()
+    DISTANCE = enum.auto()
+    TIME = enum.auto()
+    UNIT = DISTANCE | ANGLE | TIME
+
+    # Typed attributes
+    #: PLUGIN includes PLUGIN_GEOMETRY.
+    PLUGIN = enum.auto()
+    STRING = enum.auto()
+    MATRIX = enum.auto()
+    STRING_ARRAY = enum.auto()
+    DOUBLE_ARRAY = enum.auto()
+    FLOAT_ARRAY = enum.auto()
+    INT_ARRAY = enum.auto()
+    POINT_ARRAY = enum.auto()
+    VECTOR_ARRAY = enum.auto()
+    MATRIX_ARRAY = enum.auto()
+    MESH = enum.auto()
+    LATTICE = enum.auto()
+    NURBS_CURVE = enum.auto()
+    SPHERE = enum.auto()
+    DYN_ARRAY = enum.auto()
+    SUBD_SURFACE = enum.auto()
+    NOBJECT = enum.auto()
+    NID = enum.auto()
+    ANY = enum.auto()
+    ARRAY = (
+        STRING_ARRAY
+        | DOUBLE_ARRAY
+        | FLOAT_ARRAY
+        | INT_ARRAY
+        | POINT_ARRAY
+        | VECTOR_ARRAY
+        | MATRIX_ARRAY
+        | DYN_ARRAY
+    )
+    TYPED = (
+        PLUGIN
+        | STRING
+        | MATRIX
+        | ARRAY
+        | MESH
+        | LATTICE
+        | NURBS_CURVE
+        | SPHERE
+        | DYN_ARRAY
+        | SUBD_SURFACE
+        | NOBJECT
+        | NID
+        | ANY
+    )
+
+    ENUM = enum.auto()
+    MESSAGE = enum.auto()
+    COMPOUND = enum.auto()
+    GENERIC = enum.auto()
+    LIGHT_DATA = enum.auto()
+
+    # Vector attributes
+    SHORT2 = enum.auto()
+    SHORT3 = enum.auto()
+    #: INT2 includes LONG2
+    INT2 = enum.auto()
+    #: INT3 includes LONG3
+    INT3 = enum.auto()
+    FLOAT2 = enum.auto()
+    FLOAT3 = enum.auto()
+    DOUBLE2 = enum.auto()
+    DOUBLE3 = enum.auto()
+    DOUBLE4 = enum.auto()
+    VECTOR = FLOAT2 | FLOAT3 | DOUBLE2 | DOUBLE3 | DOUBLE4 | INT2 | INT3
+
+    NUMERIC = BOOL | BYTE | CHAR | FLOATING | SHORT | INT | VECTOR
+
+    # Others
+    OTHERS = enum.auto()
+
+    #: All the attribute types supported in Maya.
+    ALL = enum.auto()
+
+    def matches(self, plug):
+        """Check if the plug matches this attribute type.
+
+        Notes:
+            You can use bitwise OR operator to combine multiple types together and
+            use it to check if the plug matches any of the types, for example:
+            :attr:`XAttrType.INT` | :attr:`XAttrType.FLOAT`
+
+        Args:
+            plug (:class:`om2.MPlug` | :class:`omx.XPlug`): The plug to check.
+
+        Returns:
+            bool: True if the plug matches this attribute type, False otherwise.
+        """
+        if not plug or plug.isNull:
+            return False
+
+        if self == self.ALL:
+            return True
+
+        attrType, fn = attributeTypeAndFnFromPlug(plug)
+
+        if attrType not in _ATTR_TYPE_XMAPPING:
+            return bool(self & self.OTHERS)
+
+        mapping = _ATTR_TYPE_XMAPPING[attrType]
+        # Single mapping
+        if not isinstance(mapping, dict):
+            return bool(self & mapping)
+
+        # Mapping by data type:
+        dataType = None
+        if attrType == om2.MFn.kNumericAttribute:
+            dataType = fn.numericType()
+
+        elif attrType == om2.MFn.kTypedAttribute:
+            dataType = fn.attrType()
+
+        elif attrType == om2.MFn.kUnitAttribute:
+            dataType = fn.unitType()
+
+        if dataType not in mapping:
+            return bool(self & self.OTHERS)
+
+        return bool(self & mapping[dataType])
+
+
+# end of enums.
+_ATTR_TYPE_XMAPPING = {
+    om2.MFn.kNumericAttribute: {
+        om2.MFnNumericData.kBoolean: XAttrType.BOOL,
+        om2.MFnNumericData.kByte: XAttrType.BYTE,
+        om2.MFnNumericData.kChar: XAttrType.CHAR,
+        om2.MFnNumericData.kShort: XAttrType.SHORT,
+        om2.MFnNumericData.k2Short: XAttrType.SHORT2,
+        om2.MFnNumericData.k3Short: XAttrType.SHORT3,
+        om2.MFnNumericData.kLong: XAttrType.INT,
+        om2.MFnNumericData.kInt: XAttrType.INT,
+        om2.MFnNumericData.k2Long: XAttrType.INT2,
+        om2.MFnNumericData.k2Int: XAttrType.INT2,
+        om2.MFnNumericData.k3Long: XAttrType.INT3,
+        om2.MFnNumericData.k3Int: XAttrType.INT3,
+        om2.MFnNumericData.kInt64: XAttrType.INT,
+        om2.MFnNumericData.kFloat: XAttrType.FLOAT,
+        om2.MFnNumericData.k2Float: XAttrType.FLOAT2,
+        om2.MFnNumericData.k3Float: XAttrType.FLOAT3,
+        om2.MFnNumericData.kDouble: XAttrType.DOUBLE,
+        om2.MFnNumericData.k2Double: XAttrType.DOUBLE2,
+        om2.MFnNumericData.k3Double: XAttrType.DOUBLE3,
+        om2.MFnNumericData.k4Double: XAttrType.DOUBLE4,
+        om2.MFnNumericData.kAddr: XAttrType.ADDR,
+    },
+    om2.MFn.kUnitAttribute: {
+        om2.MFnUnitAttribute.kAngle: XAttrType.ANGLE,
+        om2.MFnUnitAttribute.kDistance: XAttrType.DISTANCE,
+        om2.MFnUnitAttribute.kTime: XAttrType.TIME,
+    },
+    om2.MFn.kTypedAttribute: {
+        om2.MFnData.kNumeric: XAttrType.NUMERIC,
+        om2.MFnData.kPlugin: XAttrType.PLUGIN,
+        om2.MFnData.kPluginGeometry: XAttrType.PLUGIN,
+        om2.MFnData.kString: XAttrType.STRING,
+        om2.MFnData.kMatrix: XAttrType.MATRIX,
+        om2.MFnData.kStringArray: XAttrType.STRING_ARRAY,
+        om2.MFnData.kDoubleArray: XAttrType.DOUBLE_ARRAY,
+        om2.MFnData.kFloatArray: XAttrType.FLOAT_ARRAY,
+        om2.MFnData.kIntArray: XAttrType.INT_ARRAY,
+        om2.MFnData.kPointArray: XAttrType.POINT_ARRAY,
+        om2.MFnData.kVectorArray: XAttrType.VECTOR_ARRAY,
+        om2.MFnData.kMatrixArray: XAttrType.MATRIX_ARRAY,
+        om2.MFnData.kMesh: XAttrType.MESH,
+        om2.MFnData.kLattice: XAttrType.LATTICE,
+        om2.MFnData.kNurbsCurve: XAttrType.NURBS_CURVE,
+        om2.MFnData.kSphere: XAttrType.SPHERE,
+        om2.MFnData.kDynArrayAttrs: XAttrType.DYN_ARRAY,
+        om2.MFnData.kSubdSurface: XAttrType.SUBD_SURFACE,
+        om2.MFnData.kNObject: XAttrType.NOBJECT,
+        om2.MFnData.kNId: XAttrType.NID,
+        om2.MFnData.kAny: XAttrType.ANY,
+    },
+    om2.MFn.kEnumAttribute: XAttrType.ENUM,
+    om2.MFn.kMatrixAttribute: XAttrType.MATRIX,
+    om2.MFn.kMessageAttribute: XAttrType.MESSAGE,
+    om2.MFn.kCompoundAttribute: XAttrType.COMPOUND,
+    om2.MFn.kGenericAttribute: XAttrType.GENERIC,
+    om2.MFn.kLightDataAttribute: XAttrType.LIGHT_DATA,
+}
 
 
 def createAttributeDummy():
@@ -104,7 +480,7 @@ def getOrExtendMPlugArray(arrayPlug, logicalIndex, dummy=None):
 
 
 def _findLeafPlug(plug, iterCount=None, maxRecursion=8, relaxed=False):
-    """ Given a plug it will walk the plug down compound or array elements
+    """Given a plug it will walk the plug down compound or array elements
     until a leaf plug (one not of type compound or array) is found.
 
     Args:
@@ -113,7 +489,7 @@ def _findLeafPlug(plug, iterCount=None, maxRecursion=8, relaxed=False):
                         infinite loops, something for the function, when it runs
                         recursively, to pass back to itself and increment
         maxRecursion (int, optional): the maximum number of recursions allowed
-        relaxed (bool, optional): Whether we keep silent on the potential error 
+        relaxed (bool, optional): Whether we keep silent on the potential error
 
     Raises:
         StopIteration: If iteration exceeds the maxRecursion.
@@ -159,7 +535,7 @@ def _findLeafPlug(plug, iterCount=None, maxRecursion=8, relaxed=False):
 
 
 def findSubplugByName(plug, token):
-    """ Give a plug recursively through all nested compounds looking for plug by name
+    """Give a plug recursively through all nested compounds looking for plug by name
 
     Args:
         plug (om2.MPlug): The compound plug.
@@ -307,7 +683,7 @@ def _findPlugOnNodeInternal(mob, plugName, networked=False, relaxed=False):
 
 
 def findPlug(plugName, node=None):
-    """ Find the om2.MPlug by name (and node)
+    """Find the om2.MPlug by name (and node)
 
     It allows to pass either attribute name plus node om2.MObject
     or the full plug path without a node.
@@ -410,13 +786,13 @@ def plugIsValid(plug):
     Notes:
        Courtesy of Maya having issues when a plug;
        - can be obtained that is fully formed
-       - responds to methods such as isCompound, isElement etc. 
+       - responds to methods such as isCompound, isElement etc.
        - also respond negatively to isNull BUT actually has an uninitialized array in its stream and will
        therefore hard crash if queried for anything relating to its array properties such as numElements etc.
 
     Args:
         plug (om2.MPlug): The plug to do validity check.
-    
+
     Returns:
         bool: True if it is a valid plug, False otherwise.
     """
@@ -440,7 +816,7 @@ def plugEnumNames(plug):
 
     Args:
         plug (om2.MPlug): the enum plug to get the enum name list.
-    
+
     Returns:
         tuple | None: A tuple of enum names, None if failed.
     """
@@ -459,7 +835,7 @@ def nextAvailableElementIndex(plug):
 
     Args:
         plug (om2.MPlug): the array plug to get the index for.
-    
+
     Returns:
         int: the next available element index, -1 if failed.
     """
@@ -477,7 +853,7 @@ def nextAvailableElement(plug):
 
     Args:
         plug (om2.MPlug): the array plug to get the element plug for.
-    
+
     Returns:
         om2.MPlug: the next available element plug, or null plug if failed.
     """
@@ -486,7 +862,7 @@ def nextAvailableElement(plug):
 
 
 def _plugLockElision(f):
-    """ Internal use only. It is a decorator to enable functions operating on plugs as 
+    """Internal use only. It is a decorator to enable functions operating on plugs as
     first argument or plug keyed argument to elide eventual locks present on the plug
 
     Args:
@@ -537,8 +913,7 @@ _ATTRIBUTE_MFUNCTORS_BY_TYPE = {
 
 
 def iterAttributeFnTypesAndClasses():
-    """Iter through all the attribute MFn types and its MFn*Attribute classes.
-    """
+    """Iter through all the attribute MFn types and its MFn*Attribute classes."""
     for fnType, fnCls in _ATTRIBUTE_MFUNCTORS_BY_TYPE.items():
         yield fnType, fnCls
 
@@ -662,14 +1037,12 @@ def valueFromPlug(
 
 
 def __num_as_float(t):
-    """Internal use only, solely meant for code compression
-    """
+    """Internal use only, solely meant for code compression"""
     return t in (om2.MFnNumericData.kFloat, om2.MFnNumericData.kDouble)
 
 
 def __num_as_int(t):
-    """Internal use only, solely meant for code compression
-    """
+    """Internal use only, solely meant for code compression"""
     # in order of likelyhood/speed centric
     return (
         t == om2.MFnNumericData.kInt
@@ -1087,11 +1460,11 @@ def setValueOnPlug(
         doIt (bool, optional): True means modifier.doIt() will be called immediately to apply the plug value change.
             False enable you to defer and call modifier.doIt() later in one go.
 
-        asDegrees (bool, optional): When it is an angle unit attribute, if this is True than we take the 
+        asDegrees (bool, optional): When it is an angle unit attribute, if this is True than we take the
             value as degrees, otherwise as radians. This flag has no effect
             when it is not an angle unit attribute.
 
-    Returns: 
+    Returns:
         None if for whatever reason the operation is invalid or has effected no change
         Otherwise it will return the original value (so it can be stored for undo support).
         Normally the pattern would be None as invalid op, False for no change,
@@ -1100,7 +1473,7 @@ def setValueOnPlug(
         invalid as well as ineffective, and rely on the user to invoke the call
         as non fault tolerant and catching specific exceptions for no-change
 
-    Todo: 
+    Todo:
         In support of the last note in the return description we need fine grained exceptions
         to enable this function to act in a ternary fashion
     """
@@ -1159,6 +1532,7 @@ def setValueOnPlug(
                 faultTolerant,
                 modifier=modifier,
                 doIt=False,
+                asDegrees=asDegrees,
             )
 
         if doIt:
@@ -1188,6 +1562,7 @@ def setValueOnPlug(
                 faultTolerant,
                 modifier=modifier,
                 doIt=False,
+                asDegrees=asDegrees,
             )
 
         if doIt:
@@ -1232,6 +1607,7 @@ def setValueOnPlug(
                 faultTolerant,
                 modifier=modifier,
                 doIt=False,
+                asDegrees=asDegrees,
             )
 
         if doIt:

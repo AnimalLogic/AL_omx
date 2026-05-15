@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 
 import unittest
 import logging
@@ -307,8 +308,7 @@ class XModifierCase(unittest.TestCase):
         self.assertEqual(len(omx.queryTrackedNodes(queryAll=True)), 0)
 
     def test_creationWithAllReturns(self):
-        """Make sure user is able to get all the newly created nodes for omx.createDagNode()
-        """
+        """Make sure user is able to get all the newly created nodes for omx.createDagNode()"""
         nodeResult = omx.createDagNode("locator", returnAllCreated=False)
         self.assertTrue(isinstance(nodeResult, omx.XNode))
         self.assertEqual(nodeResult.basicFn().typeName, "locator")

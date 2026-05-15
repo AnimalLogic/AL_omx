@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import logging
 
 from AL.omx.utils._stubs import om2
@@ -24,14 +25,13 @@ logger = logging.getLogger(__name__)
 
 
 class XNode:
-    """Easy wrapper around om2 objects mainly to access plugs. 
-    """
+    """Easy wrapper around om2 objects mainly to access plugs."""
 
     _NODE_CLASS_CACHE = {}
     _ATTRIBUTE_CACHE = {}
 
     def __init__(self, obj):
-        """ Creates a new XNode
+        """Creates a new XNode
 
         Args:
             obj (:class:`om2.MObject` | :class:`XNode` | :class:`om2.MFnBase` | string): A object to wrap
@@ -39,15 +39,14 @@ class XNode:
         Returns:
             :class:`XNode`: An instance of a XNode object
         """
+        dagPath = None
         if isinstance(obj, om2.MObject):
             mob = obj
-        elif isinstance(obj, om2.MObjectHandle):
-            mob = obj.object()
-        elif isinstance(obj, XNode):
-            mob = obj.object()
-        elif isinstance(obj, om2.MFnBase):
+        elif hasattr(obj, "object"):
+            # This should cover om2.MObjectHandle, XNode, MFnBase, XFn.
             mob = obj.object()
         elif isinstance(obj, om2.MDagPath):
+            dagPath = obj  # cache the original dagPath as many Dag functors requires dagPath instead of MObject.
             mob = obj.node()
         elif isinstance(obj, str):
             mob = _nodes.findNode(obj)
@@ -62,6 +61,17 @@ class XNode:
                 "Cannot use XNode on an object that is not a DependencyNode!"
             )
 
+        if mob.hasFn(om2.MFn.kDagNode) and dagPath is None:
+            if isinstance(obj, str):
+                dagPath = _nodes.findDagPath(
+                    obj
+                )  # this is better than getting dag path from mob.
+
+            dagPath = dagPath or om2.MDagPath.getAPathTo(
+                mob
+            )  # this simply pick the first one.
+
+        self._dagPath = dagPath
         self._mobHandle = om2.MObjectHandle(mob)
         nodeFn = om2.MFnDependencyNode(mob)
         self._lastKnownName = nodeFn.absoluteName()
@@ -186,7 +196,7 @@ class XNode:
 
         Args:
             typeName (string): the type of the object to create, e.g. "transform"
-            
+
             nodeName (str, optional): the node name, if non empty will be used in a modifier.renameObject call. Defaults to "".
 
         Returns:
@@ -202,6 +212,16 @@ class XNode:
 
         return _xmodifier.createDagNode(typeName, parent=mob, nodeName=nodeName)
 
+    def xFn(self):
+        """Returns the XFn function set wrapper for the associated MObject
+
+        Returns:
+            omx.XFn*: the XFn object for this MObject that you can use it as a function set.
+        """
+        from AL.omx import _xfn
+
+        return _xfn.XFn(self.object())
+
     def bestFn(self):
         """Returns the best MFn function set for the associated MObject
 
@@ -215,9 +235,35 @@ class XNode:
         fnList = reversed(om2.MGlobal.getFunctionSetList(mob))
         for k in fnList:
             om2Type = getattr(om2, "MFn" + k[1:], None)
-            if om2Type:
-                return om2Type(mob)
+            initDagPath = object.__getattribute__(self, "_dagPath")
+            fn = self._constructFn(om2Type, mob, initDagPath)
+            if fn:
+                return fn
+
         raise RuntimeError(f"No best Fn found for {self}")
+
+    @staticmethod
+    def _constructFn(fnType, mob, initialDagPath):
+        if fnType is None:
+            return None
+
+        if not mob.hasFn(om2.MFn.kDagNode):
+            return fnType(mob)
+
+        dagPathList = om2.MDagPath.getAllPathsTo(mob)
+        if dagPathList:
+            if len(dagPathList) > 1:
+                if initialDagPath is not None and initialDagPath in dagPathList:
+                    return fnType(initialDagPath)
+
+                # if user construct XNode with MObject that is instanced, we
+                # do not blindly guess which dag path is correct, but use MObject
+                # instead.
+                return fnType(mob)
+
+            return fnType(dagPathList[0])
+
+        return None
 
     def basicFn(self):
         """Returns the basic MFnDAGNode or MFnDependencyNode for the associated MObject
@@ -231,15 +277,59 @@ class XNode:
         """
         mob = self.object()
         if mob.hasFn(om2.MFn.kDagNode):
-            return om2.MFnDagNode(mob)
+            initDagPath = object.__getattribute__(self, "_dagPath")
+            return self._constructFn(om2.MFnDagNode, mob, initDagPath)
 
         return om2.MFnDependencyNode(mob)
 
-    def __str__(self):
-        """Returns an easy-readable str representation of this XNode. 
+    def iterXPlugs(
+        self,
+        attrType=_xplug.XAttrType.ALL,
+        states=_xplug.XPlugState.ALL,
+        predicate=lambda xplug: True,
+    ):
+        """Iterate over all XPlugs on this XNode that matches the criteria.
 
-        Construct a minimum unique path to support duplicate MObjects in scene. 
-        For invalid MObject we return the last known name with a suffix (dead) 
+        Args:
+            attrType (:class:`XAttrType`, optional): The attribute type to filter on. Defaults to :attr:`XAttrType.ALL`.
+            states (:class:`XPlugState`, optional): The plug states to filter on. Defaults to :attr:`XPlugState.ALL`.
+            predicate (:class:`callable`, optional): A function that takes an XPlug and returns a bool to further filter the plugs.
+            Defaults to a function that always returns True.
+
+        Notes:
+            Both the attrType and state parameters are int flags support the bitwise OR:
+                for plug in xnode.iterXPlugs(attrType=XAttrType.BOOL | XAttrType.FLOATING, states=XPlugState.VISIBLE):
+                    # do something with visible bool or float numeric plugs
+
+            Unlike attrType, states also support list/tuple so that you can specify multiple states that need to be matched all:
+                for plug in xnode.iterXPlugs(states=(XPlugState.KEYABLE, XPlugState.SETTABLE)):
+                    # do something with keyable plugs whose values are also settable.
+                    # For more filter options, use the predicate parameter.
+
+        Yields:
+            :class:`XPlug`: The next XPlug that matches the criteria.
+        """
+        handle = object.__getattribute__(self, "_mobHandle")
+        if not handle.isValid():
+            return
+
+        mob = handle.object()
+        fn = om2.MFnDependencyNode(mob)
+        for i in range(fn.attributeCount()):
+            attr = fn.attribute(i)
+            xplug = _xplug.XPlug(mob, attr)
+            if (
+                attrType.matches(xplug)
+                and _xplug.XPlugState.matchAll(states, xplug)
+                and predicate(xplug)
+            ):
+                yield xplug
+
+    def __str__(self):
+        """Returns an easy-readable str representation of this XNode.
+
+        Construct a minimum unique path to support duplicate MObjects in scene.
+        For invalid MObject we return the last known name with a suffix (dead)
         or (invalid) respectively.
 
         Returns:
@@ -272,8 +362,7 @@ class XNode:
         return f'XNode("{self}")'
 
     def __eq__(self, other):
-        """Add support for XNode comparison.
-        """
+        """Add support for XNode comparison."""
         if isinstance(other, XNode):
             return self.object().__eq__(other.object())
 
@@ -283,8 +372,7 @@ class XNode:
         return False
 
     def __ne__(self, other):
-        """Add support for XNode comparison.
-        """
+        """Add support for XNode comparison."""
         if isinstance(other, XNode):
             return self.object().__ne__(other.object())
 
@@ -294,6 +382,5 @@ class XNode:
         return True
 
     def __hash__(self):
-        """Add support for using XNode for containers that require uniqueness, e.g. dict key.
-        """
+        """Add support for using XNode for containers that require uniqueness, e.g. dict key."""
         return object.__getattribute__(self, "_mobHandle").hashCode()

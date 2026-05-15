@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 
 import inspect
 import contextlib
@@ -40,17 +41,17 @@ def setJournalToggle(state):
     to turn it on.
 
     Notes:
-        Keep in mind this is a global state, turning on journal will slow down the overall 
+        Keep in mind this is a global state, turning on journal will slow down the overall
         performance!
 
-        Another way to toggle the journal on is to set it to None (default value) and set the 
+        Another way to toggle the journal on is to set it to None (default value) and set the
         logging level to ``logging.DEBUG`` for ``AL.omx._xmodifier``.
 
-        Also turning the journal on only makes omx start to record journal, the creation or 
+        Also turning the journal on only makes omx start to record journal, the creation or
         edits that are already done still won't be in the journal.
 
     Args:
-        state (bool | None): the state of toggle. 
+        state (bool | None): the state of toggle.
             True = force on, off = force off, None = depends on it is DEBUG logging level
     """
     global _JOURNAL_TOGGLE
@@ -64,8 +65,7 @@ def setJournalToggle(state):
 
 
 def isJournalOn():
-    """Query if we are actually recording journal for each creation or edit by omx.
-    """
+    """Query if we are actually recording journal for each creation or edit by omx."""
     if _JOURNAL_TOGGLE is None:
         return logger.isEnabledFor(logging.DEBUG)
 
@@ -74,7 +74,7 @@ def isJournalOn():
 
 class JournalContext:
     """A python context where you set the journal state by force.
-    
+
     Notes:
         Turning on by calling :func:`setJournalToggle(True)` will slowdown omx performance
         globally. This is the suggested way to have the journal temporarily set to on/off.
@@ -102,8 +102,8 @@ class NodeCreationLog:
 
         The data is held in this form:
         [
-            [:class:`om2.MObjectHandle`,...], 
-            [:class:`om2.MObjectHandle`,...], 
+            [:class:`om2.MObjectHandle`,...],
+            [:class:`om2.MObjectHandle`,...],
             ...
         ]
     """
@@ -113,8 +113,7 @@ class NodeCreationLog:
         self._isActive = False
 
     def beginNewLog(self):
-        """Adds a new list to the node creation log.
-        """
+        """Adds a new list to the node creation log."""
         self._log.append([])
         self._isActive = True
 
@@ -172,8 +171,7 @@ _NODE_CREATION_LOG = NodeCreationLog()
 
 
 def startTrackingNodes():
-    """Start a new entry in the node creation log to track any nodes created with createNode/createDagNode/createDGNode calls.
-    """
+    """Start a new entry in the node creation log to track any nodes created with createNode/createDagNode/createDGNode calls."""
     _NODE_CREATION_LOG.beginNewLog()
 
 
@@ -225,7 +223,7 @@ class TrackCreatedNodes:
         def methodToCreateNodes():
             # Create nodes
             nodesCreated = omx.queryTrackedNodes()
-        
+
         def methodToCreateNodes():
             with TrackCreatedNodes() as tracker:
                 # Create nodes
@@ -279,7 +277,7 @@ class XModifierLog:
 
 def _modifierMethod(method):
     """A function decorator for :class:`XModifier` methods.
-    
+
     Notes:
         This decorator;
         - Converts :class:`XNode` instances to om2.MObjects .
@@ -332,7 +330,7 @@ def _modifierMethod(method):
 
 
 class XModifier:
-    """ A wrapper around :class:`MModifier` that supports :class:`XNode` instances directly
+    """A wrapper around :class:`MModifier` that supports :class:`XNode` instances directly
 
     Notes:
         When created in immediate mode, every time any modifier method is run on this object the doIt method is also run from within a
@@ -412,13 +410,13 @@ class XModifier:
         return self._clean
 
     def doIt(self, keepJournal=False):
-        """Executes the operations held by this modifier in Maya. 
-        
+        """Executes the operations held by this modifier in Maya.
+
         Notes:
             In immediate mode this will actually execute doIt from within a dynamic Maya command to allow undo to function.
 
             If doIt() is called multiple times in a row, without any intervening calls to undoIt(), then only the
-            operations which were added since the previous doIt() call will be executed. If undoIt() has been 
+            operations which were added since the previous doIt() call will be executed. If undoIt() has been
             called then the next call to doIt() will do all operations.
 
         Args:
@@ -434,7 +432,7 @@ class XModifier:
             self._reset()
 
     def undoIt(self, keepJournal=False):
-        """Undo the modifier operation in Maya. In immediate mode this function does nothing, as you should already 
+        """Undo the modifier operation in Maya. In immediate mode this function does nothing, as you should already
         be able to undo it in Maya.
 
         Notes:
@@ -475,7 +473,7 @@ class XModifier:
 
         Args:
             node (:class:`XNode` | :class:`om2.MObject`): the node to add an attribute to
-            
+
             attribute (:class:`om2.MObject`): the attribute MObject
 
         Returns:
@@ -497,7 +495,7 @@ class XModifier:
 
         Args:
             nodeClass (:class:`om2.MNodeClass`): The node class
-            
+
             attribute (:class:`om2.MObject`): The attribute MObject to add
 
         Returns:
@@ -605,7 +603,7 @@ class XModifier:
 
         Notes:
             If you try to use :func:`createDagNode()` to create an empty NurbsCurve or Mesh, calling bestFn() on the returned
-            :class:`XNode` will give you `MFnNurbsCurve` or `MFnMesh` but these are invalid to work with. You will end up getting a 
+            :class:`XNode` will give you `MFnNurbsCurve` or `MFnMesh` but these are invalid to work with. You will end up getting a
             misleading "Object does not exist." error as Maya doesn't like an empty NurbsCurve or Mesh.
 
         Raises:
@@ -615,16 +613,16 @@ class XModifier:
             typeName (str): the type of the object to create, e.g. "transform".
 
             parent (:class:`om2.MObject` | :class:`XNode`, optional): An optional parent for the DAG node to create.
-            
+
             nodeName (str, optional): the node name, if non empty will be used in a modifier.renameObject call. Defaults to "".
-            
-            manageTransformIfNeeded (bool, optional): when you create a shape without a parent, Maya will create both transform and shape, and 
-            return parent om2.MObject instead. if manageTransformIfNeeded is True, than we will also rename the transform, 
+
+            manageTransformIfNeeded (bool, optional): when you create a shape without a parent, Maya will create both transform and shape, and
+            return parent om2.MObject instead. if manageTransformIfNeeded is True, than we will also rename the transform,
             and return shape MObject instead. Most of time we keep it default True value.
-            
-            returnAllCreated (bool, optional): If True, it will return all newly created nodes, potentially including any new parent 
+
+            returnAllCreated (bool, optional): If True, it will return all newly created nodes, potentially including any new parent
             transforms and the shape of the type.
-        
+
         Returns:
             :class:`XNode` | list: An _xnode.XNode instance around the created MObject, or the list of all created nodes, if returnAllCreated is True.
         """
@@ -738,7 +736,7 @@ class XModifier:
 
     @_modifierMethod
     def linkExtensionAttributeToPlugin(self, plugin, attribute):
-        """ Links an extension attribute to a plugin
+        """Links an extension attribute to a plugin
 
         The plugin can call this method to indicate that the extension attribute
         defines part of the plugin, regardless of the node type to which it
@@ -920,7 +918,7 @@ class XModifier:
 
     @_modifierMethod
     def pythonCommandToExecute(self, callable_):
-        """ Adds an operation to execute a python command
+        """Adds an operation to execute a python command
 
         Adds an operation to the modifier to execute a Python command, which
         can be passed as either a Python callable or a string containing the
@@ -955,7 +953,7 @@ class XModifier:
 
         Args:
             node (:class:`XNode` | :class:`om2.MObject`): the node to remove the attribute from
-            
+
             attribute (:class:`om2.MObject`): the attribute MObject
 
         Returns:
@@ -977,7 +975,7 @@ class XModifier:
 
         Args:
             nodeClass (:class:`om2.MNodeClass`): The node class
-            
+
             attribute (:class:`om2.MObject`): The attribute MObject to add
 
         Returns:
@@ -1000,7 +998,7 @@ class XModifier:
 
         Args:
             nodeClass (:class:`om2.MNodeClass`): The node class
-            
+
             attribute (:class:`om2.MObject`): The attribute MObject to add
 
         Returns:
@@ -1015,7 +1013,7 @@ class XModifier:
 
         Args:
             plug (:class:`XPlug` | :class:`om2.MPlug`): The plug
-            
+
             breakConnections (bool): breaks the connections
 
         Returns:
@@ -1030,11 +1028,11 @@ class XModifier:
 
         Args:
             node (:class:`XNode` | :class:`om2.MObject`): the node to rename the attribute on
-            
+
             attribute (:class:`om2.MObject`): the attribute MObject
-            
+
             newShortName (str): The new short name
-            
+
             newLongName (str): The new long name
 
         Returns:
@@ -1049,7 +1047,7 @@ class XModifier:
 
         Args:
             node (:class:`XNode` | :class:`om2.MObject`): the node to rename
-            
+
             newName (str): the new name
 
         Returns:
@@ -1064,7 +1062,7 @@ class XModifier:
 
         Args:
             node (:class:`XNode` | :class:`om2.MObject`): the node to lock
-            
+
             newState (bool): the lock state
 
         Returns:
@@ -1089,7 +1087,7 @@ class XModifier:
 
         Args:
             plugin (:class:`om2.MObject`): The plugin
-            
+
             attribute (:class:`om2.MObject`): The attribute MObject to add
 
         Returns:
@@ -1366,11 +1364,19 @@ def commandModifierContext(command):
         logger.debug("Added modifier %r to list", mod)
         _CURRENT_MODIFIER_LIST.append(mod)
         mod._inOperation = True  # pylint: disable=protected-access
-        yield mod
-        mod._inOperation = False  # pylint: disable=protected-access
+
+        # Here we wrap yield with try..except..finally, so that a failing during this context does not mess
+        # up all the following command execution by taking the modifier as nested.
         try:
+            yield mod
             mod.doIt()
+        except Exception as e:
+            logger.error(
+                "Error during the command modifier context, check the exception for more information."
+            )
+            raise e
         finally:
+            mod._inOperation = False  # pylint: disable=protected-access
             command._modifiers = getAndClearModifierStack()  # NOQA
 
 
@@ -1379,17 +1385,17 @@ def createDagNode(
 ):
     """Creates a DAG Node within the current active :class:`XModifier`
 
-    Note: 
-        We automatically work around a limitation of the om2.MDagModifier here, where Maya would return the shape's parent 
+    Note:
+        We automatically work around a limitation of the om2.MDagModifier here, where Maya would return the shape's parent
         transform MObject. Instead we return an :class:`XNode` for the newly created Shape node if the type is of Shape.
 
     Args:
         typeName (str): The type of the DAG node to create.
-        
+
         parent (:class:`XNode` | :class:`om2.MObject` | :class:`om2.MFnDagNode` | str, optional): The parent of the DAG node to create. Defaults to `om2.MObject.kNullObj`.
-        
+
         nodeName (str, optional): The name of the node to create (used to call mod.renameNode after creation). Defaults to "".
-        
+
         returnAllCreated (bool, optional): If True, it will return any newly created nodes, including potential new parent transform and the shape of the type.
 
     Returns:
@@ -1405,7 +1411,7 @@ def createDGNode(typeName, nodeName=""):
 
     Args:
         typeName (str): The node type name.
-        
+
         nodeName (str, optional): The node name (to be used in mod.renameNode after creation). Defaults to "".
 
     Returns:
@@ -1415,8 +1421,7 @@ def createDGNode(typeName, nodeName=""):
 
 
 def doIt():
-    """Runs doIt on all current modifiers, similar to om2.MDGModifier.doIt().
-    """
+    """Runs doIt on all current modifiers, similar to om2.MDGModifier.doIt()."""
     for mod in _CURRENT_MODIFIER_LIST[:]:
         mod.doIt()
 

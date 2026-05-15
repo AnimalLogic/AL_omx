@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -14,15 +14,13 @@
 
 
 class NullXPlugError(RuntimeError):
-    """Used when an unexpected null XPlug is encountered.
-    """
+    """Used when an unexpected null XPlug is encountered."""
 
     pass
 
 
 class PlugArrayOutOfBounds(Exception):
-    """Used for when an array's plug index does not exist.
-    """
+    """Used for when an array's plug index does not exist."""
 
     def __init__(self, message):
         """
@@ -37,7 +35,7 @@ class PlugMayaInvalidException(Exception):
     """This is very specific Exception for invalid maya plug.
 
     Notes:
-        Sometimes Maya generates plugs in an invalid state that are perfectly legal, but won't 
+        Sometimes Maya generates plugs in an invalid state that are perfectly legal, but won't
         behave as expected. These plugs can hard crash Maya when manipulated or queried.
         The most common example are arrays of compounds without any elements.
 
@@ -59,7 +57,9 @@ class PlugMayaInvalidException(Exception):
         localMessage = message or self.__DEFAULT_MESSAGE
         try:
             self.plugName = plug.name()
-        except Exception:  # yeah, it's an except all, but we don't want errorception here.
+        except (
+            Exception
+        ):  # yeah, it's an except all, but we don't want errorception here.
             self.plugName = self.__PLUGNOTFOUND_MESSAGE
 
         self.message = f"Error on plug: {self.plugName} - {localMessage}"
@@ -67,8 +67,7 @@ class PlugMayaInvalidException(Exception):
 
 
 class PlugUnhandledTypeException(Exception):
-    """This is used when a plug of a certain type is found that is not handled in code.
-    """
+    """This is used when a plug of a certain type is found that is not handled in code."""
 
     __DEFAULT_MESSAGE = "a type, or mixed type, or subtype is of an unsupported type"
     __PLUGNOTFOUND_MESSAGE = "plug name unavailable"
@@ -93,8 +92,7 @@ class PlugUnhandledTypeException(Exception):
 
 
 class PlugAttributePredicateError(Exception):
-    """An exception raised when calling predicate function ends in error.
-    """
+    """An exception raised when calling predicate function ends in error."""
 
     __PLUGNOTFOUND_MESSAGE = "plug name unavailable"
 
@@ -114,8 +112,7 @@ class PlugAttributePredicateError(Exception):
 
 
 class PlugLockedForEditError(Exception):
-    """An exception raised when calling predicate function results in an error.
-    """
+    """An exception raised when calling predicate function results in an error."""
 
     __PLUGNOTFOUND_MESSAGE = "[INVALID PLUG]."
 

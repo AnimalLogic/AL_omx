@@ -75,7 +75,8 @@ Supported Environment
 +------------+------------+
 |  Python    |    Maya    |
 +============+============+
-|    3.7+    |    2022+   |
+|    3.10+   |    2024+   |
 +------------+------------+
 
-|project| might still work in earlier Maya version, but Maya 2022 and later versions are the ones that we heavily tested upon.
+|project| may still work in versions of Maya earlier than 2024, however it is recommended to use Maya 2024 and above as 
+these versions are the ones that we have heavily tested upon.

@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 
 import unittest
 
@@ -94,3 +95,34 @@ class NodesBasicsCase(unittest.TestCase):
         # test invalid string
         node = _nodes.findNode("someInvalidName")
         self.assertEqual(node, None)
+
+    def test_createSelectionList(self):
+        cmds.polyCube()
+        cmds.polyCube()
+        cube2SelSet = _nodes.createSelectionList("pCube2")
+        self.assertIsInstance(cube2SelSet, om2.MSelectionList)
+        cube3MObj = cube2SelSet.getDependNode(0)
+        cube3DagPath = om2.MDagPath.getAPathTo(cube3MObj)
+        plug = om2.MFnDependencyNode(cube3MObj).findPlug("tx", True)
+        self.assertIsInstance(
+            _nodes.createSelectionList("pCube2", cube3MObj, cube3DagPath, plug),
+            om2.MSelectionList,
+        )
+
+    def test_findDagPath(self):
+        # dg nodes get no path:
+        self.assertFalse(_nodes.findDagPath("time1"))
+
+        # non-exist dag return None:
+        self.assertFalse(_nodes.findDagPath("doesNotExist"))
+
+        # existing dag should all works:
+        cubeTransform = cmds.polyCube()[0]
+        self.assertIsInstance(_nodes.findDagPath(cubeTransform), om2.MDagPath)
+
+        cubeGrp = cmds.group(cubeTransform)
+        cmds.duplicate(cubeGrp)
+        cubeShape = cmds.listRelatives(
+            f"{cubeGrp}|{cubeTransform}", s=True, fullPath=True
+        )[0]
+        self.assertIsInstance(_nodes.findDagPath(cubeShape), om2.MDagPath)

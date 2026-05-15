@@ -49,3 +49,38 @@ print(f"After disconnection, source of {transform.r}: {transform.r.source()}")
 # undo & redo
 omx.currentModifier().undoIt()
 omx.currentModifier().doIt()
+
+# More queries using omx.XFn
+for shape in transform.xFn().iterShapes():
+    print("Query shape:", shape)
+
+locatorParent = omx.XFn(locator).getParent()
+print(f"Parent for {locator} is {locatorParent}.")
+
+# Iterating all dynamic plugs but we don't have any in this scene:
+for plug in transform.iterXPlugs(states=omx.XPlugState.DYNAMIC):
+    print("Dynamic plug:", plug)
+
+# Iterating plugs that are visible and settable:
+for plug in transform.iterXPlugs(
+    states=(omx.XPlugState.VISIBLE, omx.XPlugState.SETTABLE)
+):
+    print("Settable & visible plug:", plug)
+
+
+# Iterating plugs that are visible and also locked or connected or both:
+for plug in transform.iterXPlugs(
+    states=(omx.XPlugState.VISIBLE, omx.XPlugState.LOCKED | omx.XPlugState.DESTINATION)
+):
+    print("Visible and (locked or connected) plug:", plug)
+
+# Get all translate plugs:
+for plug in transform.iterXPlugs(
+    attrType=omx.XAttrType.DISTANCE, states=omx.XPlugState.VISIBLE
+):
+    print("Translation plug:", plug)
+
+# Get all X component plugs of TRS:
+isXComponent = lambda plug: str(plug).endswith("X")
+for plug in transform.iterXPlugs(states=omx.XPlugState.VISIBLE, predicate=isXComponent):
+    print("X component plug:", plug)

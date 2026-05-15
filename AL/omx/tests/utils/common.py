@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -18,17 +18,14 @@ from AL.omx.utils import _contexts
 
 
 def runTestsWithUndoEnabled(testcase):
-    """A quick util to make sure all unittests in your testcase run with undo/redo recording enabled.
-
-    """
+    """A quick util to make sure all unittests in your testcase run with undo/redo recording enabled."""
     context = _contexts.UndoStateSwitcher(True)
     testcase.contextEnterValue = context.__enter__()
     testcase.addCleanup(context.__exit__)
 
 
 def setupSimplestScene():
-    """Create polyCube and select a bunch of nodes, and return the polyCube's parent transform node name.
-    """
+    """Create polyCube and select a bunch of nodes, and return the polyCube's parent transform node name."""
     transform, _ = cmds.polyCube(
         w=1, h=1, d=1, sx=1, sy=1, sz=1, ax=[0, 1, 0], cuv=4, ch=1
     )

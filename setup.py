@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -44,7 +44,7 @@ setup(
     long_description=readme(),
     long_description_content_type="text/markdown",
     url="https://github.com/animallogic/AL_omx",
-    author="Animal Logic",
+    author="Netflix, Inc.",
     author_email="",
     license="Apache License, Version 2.0",
     classifiers=[

@@ -64,6 +64,18 @@ Here are some convenient entries:
 - [Running Tests](https://animallogic.github.io/AL_omx/getting_started/run_tests.html)
 - [Changes Log](https://animallogic.github.io/AL_omx/changes.html)
 
+
+
+
+
 ## Contribution & Feedback
 For how to contribute to `AL_omx`, check out [here](https://animallogic.github.io/AL_omx/feedback/contributing.html).
 If you have any issues or feature suggestions, please feel free to submit a ticket in [GitHub Issues](https://github.com/AnimalLogic/AL_omx/issues).
+
+## Update on Project Governance and Contributions
+As of May 11 2026, the AL_omx project is updating its contribution process.
+
+### What is Changing?
+Retirement of Formal CLAs: We no longer require contributors to sign and email a PDF of the Individual or Corporate Contributor License Agreement.
+By submitting a contribution to this project, you represent that you are entitled to grant the relevant licenses for your contribution. All contributions are now governed strictly by the Apache License, Version 2.0 included in this repository.
+If you or your corporation have already signed a CLA for the AL_omx project, those agreements remain on file as a historical record of the intellectual property permissions granted for previous versions of the software.

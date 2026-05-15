@@ -1,11 +1,12 @@
-Contributor License Agreement
-=====================================
-Before contributing code to |project|, we ask that you sign a Contributor License Agreement (CLA).  At the root of the repo you can find the two possible CLAs:
+Update on Project Governance and Contributions
+=================================================
+As of May 11 2026, the AL_omx project is updating its contribution process.
 
-- `AL_omx_Corporate_CLA.pdf <https://github.com/AnimalLogic/AL_omx/blob/main/AL_omx_Corporate_CLA.pdf>`_ please sign this one for corporate use
-- `AL_omx_Individual_CLA.pdf <https://github.com/AnimalLogic/AL_omx/blob/main//AL_omx_Individual_CLA.pdf>`_ please sign this one if you're an individual contributor
-
-Once your CLA is signed, send it to opensource@al.com.au (please make sure to include your github username) and wait for confirmation that we've received it.  After that, you can submit pull requests.
+What is Changing?
+---------------------
+Retirement of Formal CLAs: We no longer require contributors to sign and email a PDF of the Individual or Corporate Contributor License Agreement.
+By submitting a contribution to this project, you represent that you are entitled to grant the relevant licenses for your contribution. All contributions are now governed strictly by the Apache License, Version 2.0 included in this repository.
+If you or your corporation have already signed a CLA for the AL_omx project, those agreements remain on file as a historical record of the intellectual property permissions granted for previous versions of the software.
 
 
 Contribution Workflow
@@ -47,4 +48,4 @@ For the python source code in AL/omx folder, here are code of conduct:
 - Use camel case in your code.
 - Use expressive variable names and function names.
 - Document your new function/method/class/arguments.
-- Run ``./reformat.sh`` or ``reformat.bat`` to make sure the coding format is correct before code submit.
+- Before code submission, please run ``./reformat.sh`` or ``reformat.bat`` to make sure the header is correct, and the code is formatted with black-25. So you will need to be in an environment that version 25 is used when running command `black`.

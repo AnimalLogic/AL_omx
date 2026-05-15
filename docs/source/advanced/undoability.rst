@@ -79,3 +79,8 @@ The difference between the two is ``setLocked()`` is undoable with :class:`omx.X
 ``isLocked`` approach is not undoable and will be likely to ruin the surrounding undo states, but it is faster than ``setLocked()``.
 As a rule of thumb, use ``omx.XPlug.isLocked = bool`` when you don't need to undo the state change, use ``setLocked()`` if the undoability 
 matters. The same rule applies to other state edits like ``isKeyable`` and ``isChannelBox``.
+
+
+.. note::
+   Edits performed by the methods from :class:`AL.omx.XFn()` or Maya's ``MFn*`` functors are not all undoable. Only use the functors
+   for query or iteration purposes if you need to support undo/redo in your code.

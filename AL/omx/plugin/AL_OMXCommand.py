@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 
 # This module should be discoverable by Maya plugin loader.
 
@@ -50,8 +51,7 @@ def installCallbacks():
 
 
 def uninstallCallbacks():
-    """Uninstall previously registered callbacks. This will be called when the omx plug-in is unloaded.
-    """
+    """Uninstall previously registered callbacks. This will be called when the omx plug-in is unloaded."""
     global __CALLBACK_ID_LIST
     for i in __CALLBACK_ID_LIST:
         om2.MMessage.removeCallback(i)
@@ -59,8 +59,7 @@ def uninstallCallbacks():
 
 
 def initializePlugin(plugin):
-    """Maya MPxPlugin hook to initialise the plug.
-    """
+    """Maya MPxPlugin hook to initialise the plug."""
     pluginFn = om2.MFnPlugin(plugin)
     pluginFn.registerCommand(
         _xcommand.XCommand.PLUGIN_CMD_NAME, _xcommand.XCommand.creator
@@ -69,8 +68,7 @@ def initializePlugin(plugin):
 
 
 def uninitializePlugin(plugin):
-    """Maya MPxPlugin hook to uninitialise the plug.
-    """
+    """Maya MPxPlugin hook to uninitialise the plug."""
     pluginFn = om2.MFnPlugin(plugin)
     pluginFn.deregisterCommand(_xcommand.XCommand.PLUGIN_CMD_NAME)
     uninstallCallbacks()

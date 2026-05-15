@@ -19,14 +19,14 @@ import sys
 # -- Project information -----------------------------------------------------
 
 project = "AL_omx"
-copyright = "Animal Logic Pty Ltd."
-author = "Animal Logic"
+copyright = "Netflix, Inc."
+author = "Netflix Animation Studios"
 license = "Apache License Version 2.0"
 
 # The short X.Y version
-version = "1.0"
+version = "1.1"
 # The full version, including alpha/beta/rc tags
-release = "1.0.2"
+release = "1.1.0"
 
 
 # -- General configuration ---------------------------------------------------
@@ -134,7 +134,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, "AL_omx.tex", "AL\\_omx Documentation", "Animal Logic", "manual"),
+    (master_doc, "AL_omx.tex", "AL\\_omx Documentation", "Netflix, Inc.", "manual"),
 ]
 
 

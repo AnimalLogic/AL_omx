@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import logging
 
 from AL.omx.utils._stubs import om2
 from AL.omx.utils import _plugs
 from AL.omx.utils import _exceptions
+from AL.omx.utils import _plugs
+from AL.omx.utils._plugs import XAttrType
+from AL.omx.utils._plugs import XPlugState
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +32,7 @@ def _currentModifier():
 
 
 class XPlug(om2.MPlug):
-    """ XPlug is not meant to be used directly, get one from :class:`XNode`!
-
-    You can use omx.XPlug over an om2.MPlug to take advantage of the extra convenience features.
+    """You can use omx.XPlug over an om2.MPlug to take advantage of the extra convenience features.
 
     Examples:
 
@@ -43,6 +45,9 @@ class XPlug(om2.MPlug):
         xplug['childAttr']          # The child xplug named 'childAttr' if xplug is a compound plug.
         xplug.xnode()               # Get you the parent xnode.
 
+        # You can also initialise XPlug directly from a string.
+        xplug = om2.XPlug("node.attr")
+
     Invalid Examples:
 
     .. code:: python
@@ -54,11 +59,30 @@ class XPlug(om2.MPlug):
     """
 
     def __init__(self, *args, **kwargs):
+        """
+        Notes:
+            XPlug supports initialization from the following types:
+            om2.XPlug()             # Null plug.
+            om2.XPlug(str)          # Init from a node.attr string. Supports child of compound attribute and array attribute.
+            om2.XPlug(mplug)        # Init from another om2.MPlug
+            om2.XPlug(xplug)        # Init from another omx.XPlug
+            om2.XPlug(mobj, mobj)   # Init from a node MObject, and an attribute MObject.
+
+        """
+        if len(args) == 1 and isinstance(args[0], str):
+            plug = _plugs.findPlug(args[0])
+            # The plug could be None so here we raise a ValueError with a clear message:
+            if plug is None:
+                raise ValueError(f"Invalid path to init an XPlug: {args[0]}")
+
+            om2.MPlug.__init__(self, plug)
+            return
+
         om2.MPlug.__init__(self, *args, **kwargs)
 
     def get(self, asDegrees=False):
         """Get the value of the plug.
-        
+
         Args:
             asDegrees (bool, optional): For an angle unit attribute we return the value in degrees or in radians.
         """
@@ -72,14 +96,14 @@ class XPlug(om2.MPlug):
             To retrieve the valid enum names, use :func:`XPlug.enumNames()`
 
             This method does many checks to make sure it works for different types of attributes.
-            If you know the type of attribute, the preference would be to use the set*() methods 
+            If you know the type of attribute, the preference would be to use the set*() methods
             instead, they are more lightweight and have better performance.
 
         Args:
             value (any): The plug value to set.
 
-            asDegrees (bool, optional): When it is an angle unit attribute, if this is True than 
-            we take the value as degrees, otherwise as radians.This flag has no effect when it is 
+            asDegrees (bool, optional): When it is an angle unit attribute, if this is True than
+            we take the value as degrees, otherwise as radians.This flag has no effect when it is
             not an angle unit attribute.
 
         Returns:
@@ -175,11 +199,11 @@ class XPlug(om2.MPlug):
         _currentModifier().newPlugValueString(self, value)
 
     def setCompoundDouble(self, value):
-        """Adds an operation to the modifier to compound attribute's double 
+        """Adds an operation to the modifier to compound attribute's double
         plugs children.
 
         Args:
-            value ([double]): the list of double value whose amount should be 
+            value ([double]): the list of double value whose amount should be
                 no larger to the amount of children.
         """
         for i, v in enumerate(value):
@@ -195,20 +219,45 @@ class XPlug(om2.MPlug):
         return _plugs.plugEnumNames(self)
 
     def disconnectFromSource(self):
-        """ Disconnect this plug from a source plug, if it's connected
-        """
+        """Disconnect this plug from a source plug, if it's connected"""
         if self.isDestination:
             with self.UnlockedModification(self):
                 _currentModifier().disconnect(self.source(), self)
 
+    class _XPlugConsolidator:
+        """An util class to re-initialise an array element plug after
+        some operations (e.g. disconnection) to keep it from becoming invalid.
+        """
+
+        def __init__(self, plug):
+            self._plug = plug
+            self._arrayPlug = None
+            self._logicalIndex = None
+            if plug.isElement:
+                self._logicalIndex = plug.logicalIndex()
+                self._arrayPlug = plug.array()
+
+        def consolidate(self):
+            if self._arrayPlug is None:
+                return self._plug
+
+            return XPlug(self._arrayPlug.elementByLogicalIndex(self._logicalIndex))
+
+    @staticmethod
+    def _checkPlug(plug, adjective, methodName):
+        if (not isinstance(plug, om2.MPlug)) or plug.isNull:
+            raise RuntimeError(f"Invalid {adjective} plug for {methodName}")
+
     def connectTo(self, destination, force=False):
-        """ Connect this plug to a destination plug
+        """Connect this plug to a destination plug
 
         Args:
             destination (:class:`om2.MPlug` | :class:`XPlug`): destination plug
 
             force (bool, optional): override existing connection
         """
+        self._checkPlug(destination, "destination", "XPlug.connectTo()")
+
         destXPlug = XPlug(destination)
         if destXPlug.isDestination:
             if not force:
@@ -219,21 +268,28 @@ class XPlug(om2.MPlug):
                 )
                 return
 
+            # for rare case when destXPlug is an array element plug, where maya somehow
+            # make the destXPlug invalid after disconnectFromSource(). Thus we need to
+            # re-initialise it right after disconnection.
+            consolidator = self._XPlugConsolidator(destXPlug)
             destXPlug.disconnectFromSource()
+            destXPlug = consolidator.consolidate()
 
         with self.UnlockedModification(destXPlug):
             _currentModifier().connect(self, destXPlug)
 
     def connectFrom(self, source, force=False):
-        """ Connect this plug to a source plug
+        """Connect this plug to a source plug
 
         This is an alias to `connect`
 
         Args:
             source (:class:`om2.MPlug` | :class:`XPlug`): source plug
-            
+
             force (bool, optional): override existing connection
         """
+        self._checkPlug(source, "source", "XPlug.connectFrom()")
+
         if self.isDestination:
             if not force:
                 logger.warning(
@@ -248,23 +304,20 @@ class XPlug(om2.MPlug):
             _currentModifier().connect(source, self)
 
     def setLocked(self, locked):
-        """Set the plug's lock state.
-        """
+        """Set the plug's lock state."""
         self._setState("lock", self.isLocked, locked)
 
     def setKeyable(self, keyable):
-        """Set the plug's keyable state.
-        """
+        """Set the plug's keyable state."""
         self._setState("keyable", self.isKeyable, keyable)
 
     def setChannelBox(self, channelBox):
-        """Set the plug's channelBox state.
-        """
+        """Set the plug's channelBox state."""
         self._setState("channelBox", self.isChannelBox, channelBox)
 
     def source(self):
         """Returns the source connection as an XPlug.
-        
+
         Returns:
             omx.XPlug | NullPlug : A valid XPlug if there is a source connection, NullPlug (as an XPlug) if is there is no source connection.
         """
@@ -283,7 +336,7 @@ class XPlug(om2.MPlug):
 
     def destinations(self):
         """Get the destination plugs as a list of XPlugs for valid outgoing connections.
-        
+
         Returns:
             List[omx.XPlug, ] | []
         """
@@ -330,9 +383,15 @@ class XPlug(om2.MPlug):
 
     class UnlockedModification:
         def __init__(self, xplug):
-            self._xplug = xplug
+            self._xplug = XPlug(xplug) if (xplug and not xplug.isNull) else None
 
         def __enter__(self):
+            if self._xplug is None:
+                logger.error(
+                    "Entering UnlockedModification context with invalid MPlug/XPlug, the context will do nothing."
+                )
+                return self
+
             self._oldLocked = self._xplug.isLocked
             if self._oldLocked:
                 # here we cannot use `plug.isLocked = False` because when doIt()
@@ -341,6 +400,9 @@ class XPlug(om2.MPlug):
             return self
 
         def __exit__(self, *_, **__):
+            if self._xplug is None:
+                return
+
             if self._oldLocked:
                 self._xplug.setLocked(True)
 
@@ -386,7 +448,7 @@ class XPlug(om2.MPlug):
                 yield XPlug(self.child(i))
 
     def __getitem__(self, key):
-        """Adds support for the `xplug[key]` syntax where you can get one of an array's elements, 
+        """Adds support for the `xplug[key]` syntax where you can get one of an array's elements,
         or a compound's child, as XPlug.
 
         Args:
@@ -394,7 +456,7 @@ class XPlug(om2.MPlug):
 
         Returns:
             :class:`XPlug`
-        
+
         Raises:
             AttributeError if compound plug doesn't have the child with name, TypeError
             for all the other cases.
@@ -424,15 +486,15 @@ class XPlug(om2.MPlug):
         raise TypeError(f"The valid types for XPlug['{key}'] are: int | string.")
 
     def __contains__(self, key):
-        """Add support for the `key in xPlug` syntax. 
-        
+        """Add support for the `key in xPlug` syntax.
+
         Checks if the index is an existing index of an array, or the str name is a valid child of a compound.
 
         Args:
             key (int | str): The array element plug logical index or the child plug name.
 
         Notes:
-            We can extend to accept om2.MPlug or omx.XPlug as the input to check, but here we just 
+            We can extend to accept om2.MPlug or omx.XPlug as the input to check, but here we just
             stay lined up with __getitem__().
 
         Returns:
@@ -449,7 +511,7 @@ class XPlug(om2.MPlug):
         return False
 
     def __str__(self):
-        """Returns an easy-readable str representation of this XPlug. Constructs a minimum unique path 
+        """Returns an easy-readable str representation of this XPlug. Constructs a minimum unique path
         to support duplicate MObjects in scene. "NullPlug" will be returned if this plug isNull.
 
         Returns:

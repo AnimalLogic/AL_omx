@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 """This is a middle layer to import modules from Maya. If we fail we will
-fallback to stub mode. 
+fallback to stub mode.
 """
 
 cmds = None
@@ -67,26 +68,23 @@ def _useDummyMayaModules():
     from unittest.mock import MagicMock
 
     class _OpenMaya(MagicMock):
-        """A dummy stub object for maya.api.OpenMaya to silence the module import error when 
-        importing AL.omx outside the Autodesk Maya environment; mainly for API document 
+        """A dummy stub object for maya.api.OpenMaya to silence the module import error when
+        importing AL.omx outside the Autodesk Maya environment; mainly for API document
         generation purpose.
         """
 
         class MPxCommand:
-            """A dummy for MPxCommand inheritance to avoid python import error.
-            """
+            """A dummy for MPxCommand inheritance to avoid python import error."""
 
             pass
 
         class MPlug:
-            """A dummy for MPlug inheritance to avoid python import error.
-            """
+            """A dummy for MPlug inheritance to avoid python import error."""
 
             pass
 
         class MDagModifier:
-            """A dummy for MDagModifier inheritance to avoid python import error.
-            """
+            """A dummy for MDagModifier inheritance to avoid python import error."""
 
             pass
 

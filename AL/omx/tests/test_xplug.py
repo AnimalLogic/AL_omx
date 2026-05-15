@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 
 import unittest
 import logging
@@ -29,6 +30,25 @@ class XPlugCase(unittest.TestCase):
     def setUp(self):
         common.runTestsWithUndoEnabled(self)
         cmds.file(new=True, f=True)
+
+    def testXPlugInit(self):
+        """Make sure we support initialize XPlug from node.attribute string."""
+        nodeName = "myTrn"
+        trn = omx.createDagNode("transform", nodeName=nodeName)
+        validPaths = (
+            f"{nodeName}.tx",
+            f"{nodeName}.translateX",
+            f"{nodeName}.translate",
+            f"{nodeName}.t.tx",
+            f"{nodeName}.wm[0]",
+        )
+        for path in validPaths:
+            plug = omx.XPlug(path)
+            self.assertTrue(plug and not plug.isNull)
+
+        invalidPaths = ("", f"{nodeName}.tx1")
+        for path in invalidPaths:
+            self.assertRaises(ValueError, lambda: omx.XPlug(path))
 
     def testArrayElementXPlugAccess(self):
         trn = omx.createDagNode("transform", nodeName="myTrn")
@@ -57,8 +77,7 @@ class XPlugCase(unittest.TestCase):
         self.assertFalse("rnd" in trn.t)
 
     def testMultipleCompoundChildXPlugAccess(self):
-        """Test XPlug accessibility for child compound attribute with multiple compound peer attributes.
-        """
+        """Test XPlug accessibility for child compound attribute with multiple compound peer attributes."""
         trn = omx.createDagNode("transform", nodeName="myTrn")
 
         compoundAttrFn = om2.MFnCompoundAttribute()
@@ -320,3 +339,19 @@ class XPlugCase(unittest.TestCase):
             self.assertAlmostEqual(
                 normalPlug.get(asDegrees=not asDegrees), inputValue, 4
             )
+
+    def testSetPlugAngleTupleValue(self):
+        node = omx.createDagNode("transform")
+        degreePlug = node.rotate
+        degree = 90
+        inputValue = (0, 0, degree)
+        degreePlug.set(inputValue, asDegrees=True)
+
+        self.assertEqual(tuple(degreePlug.get(asDegrees=True)), inputValue)
+
+        rotZPlug = node.rz
+        self.assertEqual(rotZPlug.get(asDegrees=True), degree)
+
+        degreeTrans = node.translate
+        degreeTrans.set(inputValue, asDegrees=True)
+        self.assertEqual(tuple(degreeTrans.get()), inputValue)

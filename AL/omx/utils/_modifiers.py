@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import logging
 import warnings
 
@@ -21,8 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class MModifier(om2.MDagModifier):
-    """MModifier is a `om2.MDagModifier` that implements the ability to create both DG and DAG node.
-    """
+    """MModifier is a `om2.MDagModifier` that implements the ability to create both DG and DAG node."""
 
     def __init__(self):
         om2.MDagModifier.__init__(self)
@@ -57,7 +57,7 @@ class MModifier(om2.MDagModifier):
 
         Args:
             typeName (str): The Maya node type name.
-            parent (om2.MObject, optional): The parent MObject. 
+            parent (om2.MObject, optional): The parent MObject.
 
         Returns:
             om2.MObject: The DAG node created.
@@ -71,8 +71,7 @@ class MModifier(om2.MDagModifier):
         return mob
 
     def redoIt(self):
-        """Actually perform the action in the modifier.
-        """
+        """Actually perform the action in the modifier."""
         om2.MDagModifier.doIt(self)
 
     def createNode(self, *args, **kwargs):
@@ -91,8 +90,7 @@ class MModifier(om2.MDagModifier):
 
 
 class ToDGModifier:
-    """A python context to use an :class:`MModifier` in DG mode, which means :func:`MModifier.createNode()` will create a DG node.
-    """
+    """A python context to use an :class:`MModifier` in DG mode, which means :func:`MModifier.createNode()` will create a DG node."""
 
     def __init__(self, mmodifer):
         self._mmodifer = mmodifer
@@ -107,8 +105,7 @@ class ToDGModifier:
 
 
 class ToDagModifier:
-    """A python context to use an :class:`MModifier` in DAG mode, which means :func:`MModifier.createNode()` will create a DAG node.
-    """
+    """A python context to use an :class:`MModifier` in DAG mode, which means :func:`MModifier.createNode()` will create a DAG node."""
 
     def __init__(self, mmodifer):
         self._mmodifer = mmodifer

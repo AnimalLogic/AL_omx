@@ -1,4 +1,4 @@
-# Copyright © 2023 Animal Logic. All Rights Reserved.
+# Copyright © 2026 Netflix, Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.#
@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._xplug import XPlug  # NOQA: F401
+
+from ._xplug import XPlug, XAttrType, XPlugState  # NOQA: F401
 from ._xnode import XNode  # NOQA: F401
+from ._xfn import XFn  # NOQA: F401
 from ._xmodifier import (
     createDagNode,
     createDGNode,
@@ -49,6 +51,9 @@ __all__ = [
     "commandModifierContext",
     "XPlug",
     "XNode",
+    "XFn",
+    "XAttrType",
+    "XPlugState",
     "XModifier",
     "queryTrackedNodes",
     "TrackCreatedNodes",
